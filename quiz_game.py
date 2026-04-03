@@ -192,7 +192,7 @@ class QuizGame:
     def add_quiz(self) -> None:
         question = self.ui.get_non_empty_text("문제를 입력하세요: ")
         choices = [
-            self.ui.get_non_empty_text(f"선택지 {index}을 입력하세요: ")
+            self.ui.get_non_empty_text(f"선택지 {index}번을 입력하세요: ")
             for index in range(1, 5)
         ]
         answer = self.ui.get_valid_number("정답 번호를 입력하세요(1-4): ", MIN_ANSWER, MAX_ANSWER)
@@ -264,4 +264,3 @@ class QuizGame:
                 "hint_used_count": hint_used_count,
             }
         )
-
