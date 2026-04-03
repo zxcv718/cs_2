@@ -63,7 +63,17 @@ class QuizTestCase(unittest.TestCase):
         self.assertTrue(quiz.has_hint())
         self.assertEqual(quiz.get_hint_text(), "힌트")
 
+    def test_to_display_data_returns_serializable_copy(self):
+        quiz = Quiz("문제", ["A", "B", "C", "D"], 1, hint="힌트")
+
+        display_data = quiz.to_display_data()
+        display_data["choices"][0] = "수정됨"
+
+        self.assertEqual(display_data["question"], "문제")
+        self.assertEqual(display_data["answer"], 1)
+        self.assertEqual(display_data["hint"], "힌트")
+        self.assertEqual(quiz.choices[0], "A")
+
 
 if __name__ == "__main__":
     unittest.main()
-

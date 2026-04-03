@@ -1,12 +1,6 @@
 from __future__ import annotations
 
-from constants import (
-    APP_TITLE,
-    HINT_TOKENS,
-    NO_TOKENS,
-    STATE_ENCODING,
-    YES_TOKENS,
-)
+from constants import APP_TITLE, HINT_TOKENS, NO_TOKENS, YES_TOKENS
 from quiz import Quiz
 
 
@@ -141,4 +135,3 @@ class ConsoleUI:
         if hint_used_count:
             print(f"힌트 사용 수: {hint_used_count}")
         print("=" * 40)
-
