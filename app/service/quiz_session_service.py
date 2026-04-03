@@ -35,6 +35,8 @@ class QuizSessionService:
         correct_count = c.INITIAL_CORRECT_COUNT
         hint_used_count = c.INITIAL_HINT_USED_COUNT
 
+        # 바깥 for문은 "문제 단위" 반복이고,
+        # 안쪽 while문은 "한 문제 안에서 올바른 입력이 들어올 때까지" 반복입니다.
         for index, quiz in enumerate(selected_quizzes, start=c.DISPLAY_INDEX_START):
             self.ui.show_question(quiz, index, len(selected_quizzes))
             used_hint_for_question = False
@@ -62,6 +64,8 @@ class QuizSessionService:
                     )
                     used_hint_for_question = True
                     hint_used_count += 1
+                    # 힌트를 본 뒤에도 바로 정답을 맞힌 것은 아니므로
+                    # 같은 문제에서 다시 답을 입력받아야 합니다.
                     continue
 
                 # 숫자를 입력한 경우 정답 여부를 확인합니다.
@@ -76,8 +80,12 @@ class QuizSessionService:
                             correct_text=correct_text,
                         )
                     )
+                # 정답이든 오답이든 숫자 답변까지 끝났으면
+                # 현재 문제 반복을 종료하고 다음 문제로 넘어갑니다.
                 break
 
+        # 최종 반환값 하나에 필요한 결과를 모두 묶어 두면
+        # QuizGame 쪽에서 값 여러 개를 따로 계산하지 않아도 됩니다.
         return QuizSessionResult(
             total_questions=len(selected_quizzes),
             correct_count=correct_count,
@@ -96,6 +104,7 @@ class QuizSessionService:
     # 정답 점수와 힌트 감점을 반영해 최종 점수를 계산합니다.
     def calculate_score(self, correct_count: int, hint_used_count: int) -> int:
         score = correct_count * c.SCORE_PER_CORRECT - hint_used_count * self.hint_penalty
+        # 감점이 커도 음수 점수는 만들지 않도록 0점 아래는 막습니다.
         return max(c.MINIMUM_SCORE, score)
 
     # 최고 점수가 갱신됐는지 함께 알려줍니다.
@@ -106,6 +115,8 @@ class QuizSessionService:
 
     # 플레이 결과를 history에 저장할 딕셔너리로 바꿉니다.
     def create_history_entry(self, result: QuizSessionResult) -> dict[str, Any]:
+        # played_at을 같이 저장해 두면
+        # 나중에 "언제 플레이했는지"를 history에서 확인할 수 있습니다.
         return {
             c.HISTORY_FIELD_PLAYED_AT: datetime.now().isoformat(
                 timespec=c.DATETIME_TIMESPEC
@@ -118,6 +129,7 @@ class QuizSessionService:
 
     # 퀴즈 목록을 섞은 뒤 원하는 개수만큼 잘라서 반환합니다.
     def _select_quizzes(self, quizzes: list[Quiz], question_count: int) -> list[Quiz]:
+        # 원본 self.quizzes 순서를 바꾸지 않으려고 복사본을 만든 뒤 섞습니다.
         working_quizzes = list(quizzes)
         random.shuffle(working_quizzes)
         return working_quizzes[:question_count]

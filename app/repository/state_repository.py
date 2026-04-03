@@ -26,6 +26,8 @@ class StateRepository:
             raise
 
         # 파일 형식이 맞는지 먼저 검사합니다.
+        # JSON 문법이 맞아도 필요한 키가 빠졌을 수 있으므로
+        # 파싱 성공 뒤에 한 번 더 스키마 검증을 합니다.
         try:
             self._validate_state_data(data)
         except ValueError as exc:
@@ -51,6 +53,8 @@ class StateRepository:
             raise ValueError(c.ERROR_BEST_SCORE_MUST_BE_INTEGER_OR_NONE)
 
         # Quiz 객체를 JSON으로 저장 가능한 딕셔너리로 바꿉니다.
+        # 객체 자체는 json.dump로 바로 저장할 수 없기 때문에
+        # 문자열, 숫자, 리스트, 딕셔너리 형태로 바꿔야 합니다.
         payload: dict[str, Any] = {
             c.STATE_KEY_QUIZZES: [self._quiz_to_dict(quiz) for quiz in quizzes],
             c.STATE_KEY_BEST_SCORE: best_score,
@@ -104,10 +108,14 @@ class StateRepository:
         if c.STATE_KEY_BEST_SCORE not in data:
             raise ValueError(c.ERROR_STATE_MUST_INCLUDE_BEST_SCORE)
 
+        # 최고 점수는 아직 플레이 전이면 None일 수 있고,
+        # 값이 있다면 정수여야 합니다.
         best_score = data[c.STATE_KEY_BEST_SCORE]
         if best_score is not None and not self._is_int(best_score):
             raise ValueError(c.ERROR_BEST_SCORE_MUST_BE_INTEGER_OR_NONE)
 
+        # quizzes와 history는 안쪽 원소까지 모두 검사해야
+        # 중간에 잘못된 데이터가 섞여 있어도 바로 잡을 수 있습니다.
         for item in data[c.STATE_KEY_QUIZZES]:
             self._validate_quiz_item(item)
 
@@ -123,6 +131,7 @@ class StateRepository:
         if not isinstance(item, dict):
             raise ValueError(c.ERROR_QUIZ_ITEM_MUST_BE_DICTIONARY)
 
+        # question, choices, answer는 퀴즈 한 문제를 복원하는 데 꼭 필요합니다.
         question = item.get(c.QUIZ_FIELD_QUESTION)
         if not isinstance(question, str) or not question.strip():
             raise ValueError(c.ERROR_QUESTION_MUST_BE_NON_EMPTY_STRING)
@@ -167,6 +176,8 @@ class StateRepository:
             if not self._is_int(value) or value < c.MINIMUM_SCORE:
                 raise ValueError(c.ERROR_NON_NEGATIVE_INTEGER_TEMPLATE.format(key=key))
 
+        # "맞힌 문제 수 > 전체 문제 수" 같은 모순된 기록은
+        # 나중에 점수 계산이나 통계 처리에서 문제를 만들 수 있습니다.
         total_questions = item[c.HISTORY_FIELD_TOTAL_QUESTIONS]
         correct_count = item[c.HISTORY_FIELD_CORRECT_COUNT]
         if correct_count > total_questions:

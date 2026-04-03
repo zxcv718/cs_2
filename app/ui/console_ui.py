@@ -31,6 +31,8 @@ class ConsoleUI:
                 continue
 
             try:
+                # 문자열 입력을 숫자로 바꿀 수 있어야
+                # 이후 범위 검사도 정확하게 할 수 있습니다.
                 value = int(normalized)
             except ValueError:
                 self.show_error(c.ERROR_ENTER_NUMBER)
@@ -80,6 +82,7 @@ class ConsoleUI:
                 self.show_error(c.ERROR_EMPTY_INPUT)
                 continue
 
+            # h, hint는 숫자 정답 대신 특별 명령으로 처리합니다.
             if value in c.HINT_TOKENS:
                 return c.HINT_COMMAND_VALUE
 

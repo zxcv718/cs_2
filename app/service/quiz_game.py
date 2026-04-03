@@ -24,6 +24,8 @@ class QuizGame:
 
     # 저장 파일에서 상태를 읽어 게임 메모리에 올립니다.
     def initialize_state(self) -> None:
+        # 실제 파일 읽기와 예외 복구는 state_service가 담당하고,
+        # QuizGame은 그 결과를 현재 메모리 상태에 반영만 합니다.
         state = self.state_service.load_or_initialize_state()
         self.quizzes = state[c.STATE_KEY_QUIZZES]
         self.best_score = state[c.STATE_KEY_BEST_SCORE]
@@ -47,7 +49,8 @@ class QuizGame:
                 self.ui.show_menu(has_delete=has_delete)
                 choice = self.ui.get_menu_choice(c.MENU_MIN_CHOICE, max_choice)
 
-                # 입력한 메뉴 번호에 따라 다른 기능을 실행합니다.
+                # 메뉴 번호를 직접 비교해 분기하면
+                # "입력 -> 기능 실행 -> 다시 메뉴로 복귀" 흐름이 한눈에 보입니다.
                 if choice == c.MENU_PLAY:
                     self.play_quiz()
                 elif choice == c.MENU_ADD:
@@ -70,14 +73,20 @@ class QuizGame:
 
     # 퀴즈 플레이를 실행하고 결과를 최고 점수와 기록에 반영합니다.
     def play_quiz(self) -> None:
+        # 실제 문제 출제와 채점은 session_service에 맡기고,
+        # 여기서는 결과를 받아 최고 점수와 history를 갱신합니다.
         result = self.session_service.play(self.quizzes)
         if result is None:
             return
 
+        # 최고 점수 갱신 여부를 함께 받아서
+        # 결과 화면 뒤에 "최고 점수 갱신" 메시지를 보여줄 수 있게 합니다.
         self.best_score, is_new_record = self.session_service.update_best_score(
             self.best_score,
             result.score,
         )
+        # history에는 플레이 결과를 딕셔너리 한 건으로 쌓아 둡니다.
+        # 이렇게 하면 나중에 JSON으로 저장하기 쉽습니다.
         self.history.append(self.session_service.create_history_entry(result))
         self.persist_state()
         self.ui.show_result(
