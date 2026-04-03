@@ -3,33 +3,40 @@ import unittest
 from pathlib import Path
 
 from app.model.quiz import Quiz
+from app.repository.quiz_payload_mapper import QuizPayloadMapper
+from app.repository.state_payload_mapper import StatePayloadMapper
 from app.repository.state_repository import StateRepository
 
 
-# StateRepository가 저장과 검증을 올바르게 하는지 테스트합니다.
+# StateRepository와 상태 매퍼들이 저장 형식을 올바르게 다루는지 테스트합니다.
 class StateRepositoryTestCase(unittest.TestCase):
     # 테스트마다 임시 state.json 파일을 준비합니다.
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.state_file = Path(self.temp_dir.name) / "state.json"
         self.repository = StateRepository(self.state_file)
+        self.quiz_mapper = QuizPayloadMapper()
+        self.state_mapper = StatePayloadMapper()
 
     # 테스트가 끝나면 임시 폴더를 정리합니다.
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    # 올바른 퀴즈 형식은 검증을 통과해야 합니다.
-    def test_validate_quiz_item_accepts_valid_item(self):
+    # 올바른 퀴즈 형식은 Quiz 객체로 복원되어야 합니다.
+    def test_quiz_payload_mapper_accepts_valid_item(self):
         item = {
             "question": "문제",
             "choices": ["A", "B", "C", "D"],
             "answer": 1,
         }
 
-        self.repository._validate_quiz_item(item)
+        quiz = self.quiz_mapper.from_payload(item)
 
-    # 정답 번호가 잘못되면 오류가 나야 합니다.
-    def test_validate_quiz_item_rejects_invalid_answer(self):
+        self.assertEqual(quiz.question, "문제")
+        self.assertEqual(quiz.answer, 1)
+
+    # 정답 번호가 잘못되면 복원 과정에서 오류가 나야 합니다.
+    def test_quiz_payload_mapper_rejects_invalid_answer(self):
         item = {
             "question": "문제",
             "choices": ["A", "B", "C", "D"],
@@ -37,10 +44,10 @@ class StateRepositoryTestCase(unittest.TestCase):
         }
 
         with self.assertRaises(ValueError):
-            self.repository._validate_quiz_item(item)
+            self.quiz_mapper.from_payload(item)
 
     # 필수 키가 있는 상태 데이터는 통과해야 합니다.
-    def test_validate_state_data_accepts_required_schema(self):
+    def test_state_payload_mapper_accepts_required_schema(self):
         data = {
             "quizzes": [
                 {
@@ -52,21 +59,24 @@ class StateRepositoryTestCase(unittest.TestCase):
             "best_score": None,
         }
 
-        self.repository._validate_state_data(data)
+        state = self.state_mapper.from_payload(data)
+
+        self.assertEqual(len(state["quizzes"]), 1)
+        self.assertIsNone(state["best_score"])
 
     # quizzes 키가 빠지면 오류가 나야 합니다.
-    def test_validate_state_data_rejects_missing_quizzes(self):
+    def test_state_payload_mapper_rejects_missing_quizzes(self):
         data = {"best_score": None}
 
         with self.assertRaises(ValueError):
-            self.repository._validate_state_data(data)
+            self.state_mapper.from_payload(data)
 
     # Quiz 객체를 저장용 딕셔너리로 바꿨다가 다시 복원할 수 있어야 합니다.
-    def test_quiz_to_dict_and_from_dict_are_consistent(self):
+    def test_quiz_payload_mapper_round_trip_is_consistent(self):
         quiz = Quiz("문제", ["A", "B", "C", "D"], 2, hint="힌트")
 
-        item = self.repository._quiz_to_dict(quiz)
-        restored = self.repository._quiz_from_dict(item)
+        item = self.quiz_mapper.to_payload(quiz)
+        restored = self.quiz_mapper.from_payload(item)
 
         self.assertEqual(restored.question, quiz.question)
         self.assertEqual(restored.choices, quiz.choices)
@@ -112,30 +122,54 @@ class StateRepositoryTestCase(unittest.TestCase):
             self.repository.load_state()
 
     # 맞힌 문제 수가 전체 문제 수보다 크면 안 됩니다.
-    def test_validate_history_item_rejects_correct_count_over_total(self):
-        item = {
-            "played_at": "2026-04-03T15:30:00",
-            "total_questions": 3,
-            "correct_count": 4,
-            "score": 20,
-            "hint_used_count": 0,
+    def test_state_payload_mapper_rejects_correct_count_over_total(self):
+        data = {
+            "quizzes": [
+                {
+                    "question": "문제",
+                    "choices": ["A", "B", "C", "D"],
+                    "answer": 1,
+                }
+            ],
+            "best_score": None,
+            "history": [
+                {
+                    "played_at": "2026-04-03T15:30:00",
+                    "total_questions": 3,
+                    "correct_count": 4,
+                    "score": 20,
+                    "hint_used_count": 0,
+                }
+            ],
         }
 
         with self.assertRaises(ValueError):
-            self.repository._validate_history_item(item)
+            self.state_mapper.from_payload(data)
 
     # 힌트 사용 수가 전체 문제 수보다 크면 안 됩니다.
-    def test_validate_history_item_rejects_hint_count_over_total(self):
-        item = {
-            "played_at": "2026-04-03T15:30:00",
-            "total_questions": 2,
-            "correct_count": 1,
-            "score": 8,
-            "hint_used_count": 3,
+    def test_state_payload_mapper_rejects_hint_count_over_total(self):
+        data = {
+            "quizzes": [
+                {
+                    "question": "문제",
+                    "choices": ["A", "B", "C", "D"],
+                    "answer": 1,
+                }
+            ],
+            "best_score": None,
+            "history": [
+                {
+                    "played_at": "2026-04-03T15:30:00",
+                    "total_questions": 2,
+                    "correct_count": 1,
+                    "score": 8,
+                    "hint_used_count": 3,
+                }
+            ],
         }
 
         with self.assertRaises(ValueError):
-            self.repository._validate_history_item(item)
+            self.state_mapper.from_payload(data)
 
 
 if __name__ == "__main__":

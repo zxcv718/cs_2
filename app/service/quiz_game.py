@@ -1,11 +1,15 @@
 import app.config.constants as c
 from app.model.quiz import Quiz
 from app.repository.state_repository import StateRepository
+from app.service.best_score_service import BestScoreService
+from app.service.default_game_state_factory import DefaultGameStateFactory
 from app.service.game_state_service import GameStateService
+from app.service.quiz_history_service import QuizHistoryService
 from app.service.quiz_catalog_service import QuizCatalogService
 from app.service.quiz_session_service import QuizSessionService
+from app.service.quiz_scoring_service import QuizScoringService
 from app.ui.console_ui import ConsoleUI
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 
 # 전체 프로그램 흐름을 조율하는 메인 서비스입니다.
@@ -14,9 +18,13 @@ class QuizGame:
         self.ui = ui
         self.state_repository = state_repository
         # 책임을 나눈 하위 서비스들을 함께 사용합니다.
-        self.state_service = GameStateService(ui, state_repository)
+        self.state_service = GameStateService(state_repository)
+        self.default_state_factory = DefaultGameStateFactory()
         self.catalog_service = QuizCatalogService(ui)
         self.session_service = QuizSessionService(ui)
+        self.scoring_service = QuizScoringService()
+        self.best_score_service = BestScoreService()
+        self.history_service = QuizHistoryService()
         self.quizzes: list[Quiz] = []
         self.best_score: Optional[int] = None
         self.history: list[dict[str, Any]] = []
@@ -24,17 +32,36 @@ class QuizGame:
 
     # 저장 파일에서 상태를 읽어 게임 메모리에 올립니다.
     def initialize_state(self) -> None:
-        # 실제 파일 읽기와 예외 복구는 state_service가 담당하고,
-        # QuizGame은 그 결과를 현재 메모리 상태에 반영만 합니다.
-        state = self.state_service.load_or_initialize_state()
-        self.quizzes = state[c.STATE_KEY_QUIZZES]
-        self.best_score = state[c.STATE_KEY_BEST_SCORE]
-        self.history = state.get(c.STATE_KEY_HISTORY, [])
+        try:
+            state = self.state_service.load_state()
+        except FileNotFoundError:
+            state = self._recover_with_default_state(
+                self.ui.show_message,
+                c.MESSAGE_STATE_FILE_MISSING,
+                should_save=True,
+            )
+        except ValueError:
+            state = self._recover_with_default_state(
+                self.ui.show_error,
+                c.ERROR_STATE_CORRUPTED,
+                should_save=True,
+            )
+        except OSError:
+            state = self._recover_with_default_state(
+                self.ui.show_error,
+                c.ERROR_STATE_READ,
+                should_save=False,
+            )
+
+        self._apply_state(state)
         self._initialized = True
 
     # 현재 메모리 상태를 파일에 저장합니다.
     def persist_state(self) -> None:
-        self.state_service.save_state(self.quizzes, self.best_score, self.history)
+        try:
+            self.state_service.save_state(self.quizzes, self.best_score, self.history)
+        except OSError:
+            self.ui.show_error(c.ERROR_STATE_SAVE)
 
     # 메뉴를 반복해서 보여주며 사용자의 선택에 맞는 기능을 실행합니다.
     def run(self) -> None:
@@ -79,19 +106,24 @@ class QuizGame:
         if result is None:
             return
 
+        score = self.scoring_service.calculate_score(
+            result.correct_count,
+            result.hint_used_count,
+        )
+
         # 최고 점수 갱신 여부를 함께 받아서
         # 결과 화면 뒤에 "최고 점수 갱신" 메시지를 보여줄 수 있게 합니다.
-        self.best_score, is_new_record = self.session_service.update_best_score(
+        self.best_score, is_new_record = self.best_score_service.update_best_score(
             self.best_score,
-            result.score,
+            score,
         )
         # history에는 플레이 결과를 딕셔너리 한 건으로 쌓아 둡니다.
         # 이렇게 하면 나중에 JSON으로 저장하기 쉽습니다.
-        self.history.append(self.session_service.create_history_entry(result))
+        self.history.append(self.history_service.create_entry(result, score))
         self.persist_state()
         self.ui.show_result(
             result.correct_count,
-            result.score,
+            score,
             result.total_questions,
             result.hint_used_count,
         )
@@ -115,3 +147,29 @@ class QuizGame:
     def delete_quiz(self) -> None:
         if self.catalog_service.delete_quiz(self.quizzes):
             self.persist_state()
+
+    # 읽어 온 상태를 현재 메모리 상태에 반영합니다.
+    def _apply_state(self, state: dict[str, Any]) -> None:
+        self.quizzes = state[c.STATE_KEY_QUIZZES]
+        self.best_score = state[c.STATE_KEY_BEST_SCORE]
+        self.history = state.get(c.STATE_KEY_HISTORY, [])
+
+    # 기본 상태로 복구하고 필요하면 바로 저장합니다.
+    def _recover_with_default_state(
+        self,
+        notify: Callable[[str], None],
+        message: str,
+        should_save: bool,
+    ) -> dict[str, Any]:
+        notify(message)
+        state = self.default_state_factory.create_state()
+        if should_save:
+            try:
+                self.state_service.save_state(
+                    state[c.STATE_KEY_QUIZZES],
+                    state[c.STATE_KEY_BEST_SCORE],
+                    state[c.STATE_KEY_HISTORY],
+                )
+            except OSError:
+                self.ui.show_error(c.ERROR_STATE_SAVE)
+        return state

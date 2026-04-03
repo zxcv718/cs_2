@@ -1,7 +1,6 @@
 import random
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Optional, Tuple
+from typing import Optional
 
 import app.config.constants as c
 from app.model.quiz import Quiz
@@ -13,15 +12,13 @@ from app.ui.console_ui import ConsoleUI
 class QuizSessionResult:
     total_questions: int
     correct_count: int
-    score: int
     hint_used_count: int
 
 
-# 퀴즈를 실제로 진행하고 점수를 계산하는 서비스입니다.
+# 퀴즈를 실제로 진행하는 서비스입니다.
 class QuizSessionService:
-    def __init__(self, ui: ConsoleUI, hint_penalty: int = c.HINT_PENALTY) -> None:
+    def __init__(self, ui: ConsoleUI) -> None:
         self.ui = ui
-        self.hint_penalty = hint_penalty
 
     # 퀴즈 플레이 한 번을 끝까지 진행하고 결과를 돌려줍니다.
     def play(self, quizzes: list[Quiz]) -> Optional[QuizSessionResult]:
@@ -89,7 +86,6 @@ class QuizSessionService:
         return QuizSessionResult(
             total_questions=len(selected_quizzes),
             correct_count=correct_count,
-            score=self.calculate_score(correct_count, hint_used_count),
             hint_used_count=hint_used_count,
         )
 
@@ -100,32 +96,6 @@ class QuizSessionService:
             c.DISPLAY_INDEX_START,
             total_questions,
         )
-
-    # 정답 점수와 힌트 감점을 반영해 최종 점수를 계산합니다.
-    def calculate_score(self, correct_count: int, hint_used_count: int) -> int:
-        score = correct_count * c.SCORE_PER_CORRECT - hint_used_count * self.hint_penalty
-        # 감점이 커도 음수 점수는 만들지 않도록 0점 아래는 막습니다.
-        return max(c.MINIMUM_SCORE, score)
-
-    # 최고 점수가 갱신됐는지 함께 알려줍니다.
-    def update_best_score(self, best_score: Optional[int], score: int) -> Tuple[int, bool]:
-        if best_score is None or score > best_score:
-            return score, True
-        return best_score, False
-
-    # 플레이 결과를 history에 저장할 딕셔너리로 바꿉니다.
-    def create_history_entry(self, result: QuizSessionResult) -> dict[str, Any]:
-        # played_at을 같이 저장해 두면
-        # 나중에 "언제 플레이했는지"를 history에서 확인할 수 있습니다.
-        return {
-            c.HISTORY_FIELD_PLAYED_AT: datetime.now().isoformat(
-                timespec=c.DATETIME_TIMESPEC
-            ),
-            c.HISTORY_FIELD_TOTAL_QUESTIONS: result.total_questions,
-            c.HISTORY_FIELD_CORRECT_COUNT: result.correct_count,
-            c.HISTORY_FIELD_SCORE: result.score,
-            c.HISTORY_FIELD_HINT_USED_COUNT: result.hint_used_count,
-        }
 
     # 퀴즈 목록을 섞은 뒤 원하는 개수만큼 잘라서 반환합니다.
     def _select_quizzes(self, quizzes: list[Quiz], question_count: int) -> list[Quiz]:
