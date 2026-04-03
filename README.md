@@ -44,6 +44,7 @@ python3 -m unittest discover -s tests
 - 첫 실행에서 `state.json`이 없으면 기본 퀴즈 데이터로 시작합니다.
 - 실행 중 퀴즈를 추가하거나 삭제하면 변경 내용이 `state.json`에 저장됩니다.
 - `Ctrl+C` 또는 입력 종료가 발생해도 가능한 범위에서 저장 후 종료하도록 처리합니다.
+- clone/pull 실습 확인을 위해 2026-04-03에 README 검증 문구를 추가했습니다.
 
 ## 파일 구조
 
