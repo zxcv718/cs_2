@@ -4,10 +4,31 @@ import app.config.constants as c
 from app.model.quiz import Quiz
 
 
-# 프로그램 시작 시 사용할 기본 상태를 만드는 팩토리입니다.
 class DefaultGameStateFactory:
-    # 코드에 들어 있는 기본 퀴즈 데이터를 Quiz 객체로 만듭니다.
+    """
+    프로그램 시작 시 사용할 기본 게임 상태를 만들어 주는 팩토리입니다.
+
+    이 클래스는 엄밀한 의미의 Factory Method 패턴보다는
+    "객체 생성 책임을 한 곳에 모아 둔 간단한 팩토리"에 가깝습니다.
+
+    이 클래스를 Quiz와 분리한 가장 큰 이유는 단일 책임 원칙(SRP)입니다.
+    Quiz는 "퀴즈 한 개의 데이터와 동작"에 집중하고,
+    이 팩토리는 "게임 시작 시 필요한 기본 객체와 상태를 조립하는 일"을 맡습니다.
+    이렇게 나누면 퀴즈 자체의 변경과 초기화 방식의 변경이 서로 덜 엉키게 됩니다.
+
+    이렇게 분리해 두면 좋은 점:
+    1. Quiz 객체와 기본 state를 만드는 규칙을 한 파일에서 관리할 수 있습니다.
+    2. 기본값이나 생성 방식이 바뀌어도 이 클래스만 수정하면 됩니다.
+    3. 다른 코드는 생성 과정 대신 "완성된 상태를 사용"하는 데 집중할 수 있습니다.
+    """
+
     def create_quizzes(self) -> list[Quiz]:
+        """
+        상수에 들어 있는 기본 퀴즈 데이터를 Quiz 객체 목록으로 변환합니다.
+
+        예를 들어 문제 형식이 바뀌거나 Quiz 생성자 인자가 달라져도
+        이 메서드만 수정하면 되므로 유지보수가 쉬워집니다.
+        """
         return [
             Quiz(
                 item[c.QUIZ_FIELD_QUESTION],
@@ -18,8 +39,15 @@ class DefaultGameStateFactory:
             for item in c.DEFAULT_QUIZ_DATA
         ]
 
-    # 기본 상태는 기본 퀴즈, 최고 점수 없음, 빈 기록으로 구성됩니다.
     def create_state(self) -> dict[str, Any]:
+        """
+        게임 시작 시 사용할 기본 상태 딕셔너리를 만듭니다.
+
+        기본 상태 구성:
+        - quizzes: create_quizzes()로 만든 기본 퀴즈 목록
+        - best_score: 아직 최고 점수가 없으므로 None
+        - history: 아직 플레이 기록이 없으므로 빈 리스트
+        """
         return {
             c.STATE_KEY_QUIZZES: self.create_quizzes(),
             c.STATE_KEY_BEST_SCORE: None,
