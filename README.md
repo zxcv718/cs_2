@@ -51,17 +51,29 @@ python3 -m unittest discover -s tests
 ```text
 cs_2/
 ├── main.py
-├── constants.py
-├── quiz.py
-├── console_ui.py
-├── state_manager.py
-├── quiz_game.py
+├── app/
+│   ├── application/
+│   │   └── quiz_game.py
+│   ├── domain/
+│   │   └── quiz.py
+│   ├── infrastructure/
+│   │   ├── constants.py
+│   │   └── state_manager.py
+│   └── ui/
+│       └── console_ui.py
 ├── state.json
 └── tests/
     ├── test_quiz.py
     ├── test_state_manager.py
     └── test_quiz_game.py
 ```
+
+## 계층 구조 메모
+
+- `app/domain`: 문제 데이터와 정답 규칙
+- `app/application`: 게임 진행 흐름과 상태 관리
+- `app/infrastructure`: 상수와 JSON 저장소 처리
+- `app/ui`: 콘솔 입출력 처리
 
 ## 데이터 파일 설명
 

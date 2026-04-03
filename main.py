@@ -1,7 +1,7 @@
-from console_ui import ConsoleUI
-from constants import STATE_FILE
-from quiz_game import QuizGame
-from state_manager import StateManager
+from app.application.quiz_game import QuizGame
+from app.infrastructure.constants import STATE_FILE
+from app.infrastructure.state_manager import StateManager
+from app.ui.console_ui import ConsoleUI
 
 
 def main() -> None:
@@ -13,4 +13,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

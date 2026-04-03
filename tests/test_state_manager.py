@@ -2,8 +2,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from quiz import Quiz
-from state_manager import StateManager
+from app.domain.quiz import Quiz
+from app.infrastructure.state_manager import StateManager
 
 
 class StateManagerTestCase(unittest.TestCase):

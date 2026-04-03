@@ -1,7 +1,7 @@
 import unittest
 
-from quiz import Quiz
-from quiz_game import QuizGame
+from app.application.quiz_game import QuizGame
+from app.domain.quiz import Quiz
 
 
 class DummyUI:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from constants import CHOICE_COUNT, MAX_ANSWER, MIN_ANSWER
+import app.infrastructure.constants as c
 
 
 class Quiz:
@@ -23,50 +23,57 @@ class Quiz:
         return self.hint is not None
 
     def get_hint_text(self) -> str:
-        return self.hint or ""
+        return self.hint or c.EMPTY_TEXT
 
     def to_display_data(self) -> dict[str, object]:
         return {
-            "question": self.question,
-            "choices": list(self.choices),
-            "answer": self.answer,
-            "hint": self.hint,
+            c.QUIZ_FIELD_QUESTION: self.question,
+            c.QUIZ_FIELD_CHOICES: list(self.choices),
+            c.QUIZ_FIELD_ANSWER: self.answer,
+            c.QUIZ_FIELD_HINT: self.hint,
         }
 
     def _validate_question(self, question: str) -> str:
         if not isinstance(question, str):
-            raise ValueError("question must be a string")
+            raise ValueError(c.ERROR_QUESTION_MUST_BE_STRING)
         normalized = question.strip()
         if not normalized:
-            raise ValueError("question must not be empty")
+            raise ValueError(c.ERROR_QUESTION_MUST_NOT_BE_EMPTY)
         return normalized
 
     def _validate_choices(self, choices: list[str]) -> list[str]:
-        if not isinstance(choices, list) or len(choices) != CHOICE_COUNT:
-            raise ValueError(f"choices must be a list of {CHOICE_COUNT} items")
+        if not isinstance(choices, list) or len(choices) != c.CHOICE_COUNT:
+            raise ValueError(
+                c.ERROR_CHOICES_LENGTH_TEMPLATE.format(choice_count=c.CHOICE_COUNT)
+            )
 
         normalized_choices: list[str] = []
         for choice in choices:
             if not isinstance(choice, str):
-                raise ValueError("choice must be a string")
+                raise ValueError(c.ERROR_CHOICE_MUST_BE_STRING)
             normalized = choice.strip()
             if not normalized:
-                raise ValueError("choice must not be empty")
+                raise ValueError(c.ERROR_CHOICE_MUST_NOT_BE_EMPTY)
             normalized_choices.append(normalized)
         return normalized_choices
 
     def _validate_answer(self, answer: int) -> int:
         if not isinstance(answer, int) or isinstance(answer, bool):
-            raise ValueError("answer must be an integer")
-        if answer < MIN_ANSWER or answer > MAX_ANSWER:
-            raise ValueError(f"answer must be between {MIN_ANSWER} and {MAX_ANSWER}")
+            raise ValueError(c.ERROR_ANSWER_MUST_BE_INTEGER)
+        if answer < c.MIN_ANSWER or answer > c.MAX_ANSWER:
+            raise ValueError(
+                c.ERROR_ANSWER_RANGE_TEMPLATE.format(
+                    min_answer=c.MIN_ANSWER,
+                    max_answer=c.MAX_ANSWER,
+                )
+            )
         return answer
 
     def _validate_hint(self, hint: str | None) -> str | None:
         if hint is None:
             return None
         if not isinstance(hint, str):
-            raise ValueError("hint must be a string or None")
+            raise ValueError(c.ERROR_HINT_MUST_BE_STRING_OR_NONE)
         normalized = hint.strip()
         if not normalized:
             return None
