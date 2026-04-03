@@ -100,7 +100,30 @@ class StateManagerTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.manager.load_state()
 
+    def test_validate_history_item_rejects_correct_count_over_total(self):
+        item = {
+            "played_at": "2026-04-03T15:30:00",
+            "total_questions": 3,
+            "correct_count": 4,
+            "score": 20,
+            "hint_used_count": 0,
+        }
+
+        with self.assertRaises(ValueError):
+            self.manager._validate_history_item(item)
+
+    def test_validate_history_item_rejects_hint_count_over_total(self):
+        item = {
+            "played_at": "2026-04-03T15:30:00",
+            "total_questions": 2,
+            "correct_count": 1,
+            "score": 8,
+            "hint_used_count": 3,
+        }
+
+        with self.assertRaises(ValueError):
+            self.manager._validate_history_item(item)
+
 
 if __name__ == "__main__":
     unittest.main()
-
