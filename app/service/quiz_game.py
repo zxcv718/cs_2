@@ -6,7 +6,11 @@ from app.service.default_game_state_factory import DefaultGameStateFactory
 from app.service.game_state_service import GameStateService
 from app.service.quiz_history_service import QuizHistoryService
 from app.service.quiz_catalog_service import QuizCatalogService
-from app.service.quiz_session_service import QuizSessionService
+from app.service.quiz_session_service import (
+    QuizSessionInterrupted,
+    QuizSessionResult,
+    QuizSessionService,
+)
 from app.service.quiz_scoring_service import QuizScoringService
 from app.ui.console_ui import ConsoleUI
 from typing import Any, Callable, Optional
@@ -92,6 +96,11 @@ class QuizGame:
                     self.persist_state()
                     self.ui.show_message(c.MESSAGE_PROGRAM_EXIT)
                     break
+            except QuizSessionInterrupted as interrupted:
+                self._commit_interrupted_result(interrupted.partial_result)
+                self.ui.show_message(c.MESSAGE_INTERRUPTED_EXIT)
+                self.persist_state()
+                break
             except (KeyboardInterrupt, EOFError):
                 # 강제 종료가 들어와도 저장 후 안전하게 끝냅니다.
                 self.ui.show_message(c.MESSAGE_INTERRUPTED_EXIT)
@@ -106,20 +115,7 @@ class QuizGame:
         if result is None:
             return
 
-        score = self.scoring_service.calculate_score(
-            result.correct_count,
-            result.hint_used_count,
-        )
-
-        # 최고 점수 갱신 여부를 함께 받아서
-        # 결과 화면 뒤에 "최고 점수 갱신" 메시지를 보여줄 수 있게 합니다.
-        self.best_score, is_new_record = self.best_score_service.update_best_score(
-            self.best_score,
-            score,
-        )
-        # history에는 플레이 결과를 딕셔너리 한 건으로 쌓아 둡니다.
-        # 이렇게 하면 나중에 JSON으로 저장하기 쉽습니다.
-        self.history.append(self.history_service.create_entry(result, score))
+        score, is_new_record = self._record_result(result)
         self.persist_state()
         self.ui.show_result(
             result.correct_count,
@@ -173,3 +169,26 @@ class QuizGame:
             except OSError:
                 self.ui.show_error(c.ERROR_STATE_SAVE)
         return state
+
+    def _record_result(self, result: QuizSessionResult) -> tuple[int, bool]:
+        score = self.scoring_service.calculate_score(
+            result.correct_count,
+            result.hint_used_count,
+        )
+        self.best_score, is_new_record = self.best_score_service.update_best_score(
+            self.best_score,
+            score,
+        )
+        self.history.append(self.history_service.create_entry(result, score))
+        return score, is_new_record
+
+    def _commit_interrupted_result(
+        self,
+        result: Optional[QuizSessionResult],
+    ) -> None:
+        if result is None:
+            return
+
+        _, is_new_record = self._record_result(result)
+        if is_new_record:
+            self.ui.show_message(c.MESSAGE_BEST_SCORE_UPDATED)

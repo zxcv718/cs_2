@@ -1,5 +1,6 @@
 import unittest
 
+import app.config.constants as c
 from app.model.quiz import Quiz
 from app.service.best_score_service import BestScoreService
 from app.service.default_game_state_factory import DefaultGameStateFactory
@@ -7,7 +8,11 @@ from app.service.game_state_service import GameStateService
 from app.service.quiz_game import QuizGame
 from app.service.quiz_history_service import QuizHistoryService
 from app.service.quiz_scoring_service import QuizScoringService
-from app.service.quiz_session_service import QuizSessionResult
+from app.service.quiz_session_service import (
+    QuizSessionInterrupted,
+    QuizSessionResult,
+    QuizSessionService,
+)
 
 
 # 실제 입력 대신 테스트에서 사용할 가짜 UI입니다.
@@ -23,6 +28,35 @@ class DummyUI:
     # 출력된 오류 메시지를 리스트에 모읍니다.
     def show_error(self, message):
         self.errors.append(message)
+
+
+class PlayMenuOnceUI(DummyUI):
+    def show_menu(self, has_delete=False):
+        return None
+
+    def get_menu_choice(self, min_value, max_value):
+        return c.MENU_PLAY
+
+    def show_result(self, correct_count, score, total_questions, hint_used_count=0):
+        return None
+
+
+class InterruptingSessionUI(DummyUI):
+    def __init__(self):
+        super().__init__()
+        self.answer_call_count = 0
+
+    def get_valid_number(self, prompt, min_value, max_value):
+        return 2
+
+    def show_question(self, quiz, index, total):
+        return None
+
+    def get_answer_or_hint(self, prompt, min_value=1, max_value=4):
+        self.answer_call_count += 1
+        if self.answer_call_count == 1:
+            return 1
+        raise KeyboardInterrupt
 
 
 # 실제 파일 대신 메모리에 저장 결과를 남기는 가짜 저장소입니다.
@@ -64,6 +98,19 @@ class BrokenStateRepository(DummyStateRepository):
 class FailingSaveStateRepository(DummyStateRepository):
     def save_state(self, quizzes, best_score, history=None):
         raise OSError("save failed")
+
+
+class DeterministicQuizSessionService(QuizSessionService):
+    def _select_quizzes(self, quizzes, question_count):
+        return list(quizzes)[:question_count]
+
+
+class InterruptedSessionService:
+    def __init__(self, partial_result):
+        self.partial_result = partial_result
+
+    def play(self, quizzes):
+        raise QuizSessionInterrupted(self.partial_result)
 
 
 # 기본 상태 생성 책임을 테스트합니다.
@@ -175,6 +222,26 @@ class QuizHistoryServiceTestCase(unittest.TestCase):
         self.assertIn("played_at", item)
 
 
+class QuizSessionServiceTestCase(unittest.TestCase):
+    def test_play_raises_interrupted_with_partial_result_after_answer(self):
+        ui = InterruptingSessionUI()
+        service = DeterministicQuizSessionService(ui)
+        quizzes = [
+            Quiz("문제1", ["A", "B", "C", "D"], 1),
+            Quiz("문제2", ["A", "B", "C", "D"], 2),
+        ]
+
+        with self.assertRaises(QuizSessionInterrupted) as context:
+            service.play(quizzes)
+
+        partial_result = context.exception.partial_result
+
+        self.assertIsNotNone(partial_result)
+        self.assertEqual(partial_result.total_questions, 2)
+        self.assertEqual(partial_result.correct_count, 1)
+        self.assertEqual(partial_result.hint_used_count, 0)
+
+
 # QuizGame이 하위 서비스를 제대로 호출하는지 테스트합니다.
 class QuizGameTestCase(unittest.TestCase):
     # 기본 가짜 객체를 붙여 게임 객체를 쉽게 만듭니다.
@@ -223,6 +290,34 @@ class QuizGameTestCase(unittest.TestCase):
 
         self.assertGreaterEqual(len(game.quizzes), 5)
         self.assertTrue(ui.errors)
+
+    def test_run_persists_partial_result_when_session_is_interrupted(self):
+        ui = PlayMenuOnceUI()
+        repository = DummyStateRepository()
+        repository.loaded_state = {
+            "quizzes": [
+                Quiz("문제1", ["A", "B", "C", "D"], 1),
+                Quiz("문제2", ["A", "B", "C", "D"], 2),
+            ],
+            "best_score": None,
+            "history": [],
+        }
+        game = self.make_game(state_repository=repository, ui=ui)
+        game.session_service = InterruptedSessionService(
+            QuizSessionResult(
+                total_questions=2,
+                correct_count=1,
+                hint_used_count=0,
+            )
+        )
+
+        game.run()
+
+        self.assertIsNotNone(repository.saved)
+        self.assertEqual(repository.saved["best_score"], 10)
+        self.assertEqual(len(repository.saved["history"]), 1)
+        self.assertEqual(repository.saved["history"][0]["correct_count"], 1)
+        self.assertIn(c.MESSAGE_INTERRUPTED_EXIT, ui.messages)
 
 
 if __name__ == "__main__":
