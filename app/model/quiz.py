@@ -2,7 +2,7 @@ import app.config.constants as c
 from typing import Optional
 
 
-# 퀴즈 한 문제의 도메인 동작만 표현하는 엔티티입니다.
+# 퀴즈 한 문제의 관련 동작만 표현하는 클래스
 class Quiz:
     def __init__(
         self,

@@ -49,6 +49,7 @@ class StateRepository:
         payload = self.payload_mapper.to_payload(quizzes, best_score, history)
 
         # 폴더가 없으면 먼저 만들고 파일을 저장합니다.
+        # dump는 파이썬 객체를 json형식으로 파일에 바로 저장하는 함수
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         with self.state_file.open(c.FILE_WRITE_MODE, encoding=c.STATE_ENCODING) as file:
             json.dump(

@@ -8,7 +8,10 @@ from app.service.default_game_state_factory import DefaultGameStateFactory
 from app.service.game_state_service import GameStateService
 from app.service.quiz_game import QuizGame
 from app.service.quiz_history_service import QuizHistoryService
+from app.service.quiz_partial_result_builder import QuizPartialResultBuilder
+from app.service.quiz_question_round_service import QuizQuestionRoundService
 from app.service.quiz_scoring_service import QuizScoringService
+from app.service.quiz_selection_service import QuizSelectionService
 from app.service.quiz_session_service import (
     QuizSessionInterrupted,
     QuizSessionResult,
@@ -57,6 +60,41 @@ class InterruptingSessionUI(DummyUI):
         self.answer_call_count += 1
         if self.answer_call_count == 1:
             return 1
+        raise KeyboardInterrupt
+
+
+class HintThenCorrectUI(DummyUI):
+    def __init__(self):
+        super().__init__()
+        self.answer_call_count = 0
+
+    def show_question(self, quiz, index, total):
+        return None
+
+    def get_answer_or_hint(self, prompt, min_value=1, max_value=4):
+        self.answer_call_count += 1
+        if self.answer_call_count == 1:
+            return c.HINT_COMMAND_VALUE
+        return 2
+
+
+class AnswerThenHintThenInterruptUI(DummyUI):
+    def __init__(self):
+        super().__init__()
+        self.answer_call_count = 0
+
+    def get_valid_number(self, prompt, min_value, max_value):
+        return 2
+
+    def show_question(self, quiz, index, total):
+        return None
+
+    def get_answer_or_hint(self, prompt, min_value=1, max_value=4):
+        self.answer_call_count += 1
+        if self.answer_call_count == 1:
+            return 1
+        if self.answer_call_count == 2:
+            return c.HINT_COMMAND_VALUE
         raise KeyboardInterrupt
 
 
@@ -224,6 +262,43 @@ class QuizHistoryServiceTestCase(unittest.TestCase):
         self.assertIn("played_at", item)
 
 
+class QuizSelectionServiceTestCase(unittest.TestCase):
+    def test_choose_question_count_delegates_to_ui(self):
+        ui = InterruptingSessionUI()
+        service = QuizSelectionService(ui)
+
+        question_count = service.choose_question_count(5)
+
+        self.assertEqual(question_count, 2)
+
+
+class QuizQuestionRoundServiceTestCase(unittest.TestCase):
+    def test_play_round_counts_hint_and_correct_answer(self):
+        ui = HintThenCorrectUI()
+        service = QuizQuestionRoundService(ui)
+        quiz = QuizFactory().create("문제", ["A", "B", "C", "D"], 2, hint="힌트")
+
+        result = service.play_round(quiz, index=1, total_questions=3)
+
+        self.assertEqual(result.correct_count, 1)
+        self.assertEqual(result.hint_used_count, 1)
+        self.assertTrue(ui.messages)
+
+
+class QuizPartialResultBuilderTestCase(unittest.TestCase):
+    def test_build_interrupted_result_returns_none_before_any_answer(self):
+        builder = QuizPartialResultBuilder()
+
+        result = builder.build_interrupted_result(
+            total_questions=3,
+            correct_count=0,
+            hint_used_count=0,
+            answered_question_count=0,
+        )
+
+        self.assertIsNone(result)
+
+
 class QuizSessionServiceTestCase(unittest.TestCase):
     def test_play_raises_interrupted_with_partial_result_after_answer(self):
         ui = InterruptingSessionUI()
@@ -243,6 +318,24 @@ class QuizSessionServiceTestCase(unittest.TestCase):
         self.assertEqual(partial_result.total_questions, 2)
         self.assertEqual(partial_result.correct_count, 1)
         self.assertEqual(partial_result.hint_used_count, 0)
+
+    def test_play_keeps_hint_count_when_interrupted_after_showing_hint(self):
+        ui = AnswerThenHintThenInterruptUI()
+        service = DeterministicQuizSessionService(ui)
+        factory = QuizFactory()
+        quizzes = [
+            factory.create("문제1", ["A", "B", "C", "D"], 1, hint="힌트1"),
+            factory.create("문제2", ["A", "B", "C", "D"], 2, hint="힌트2"),
+        ]
+
+        with self.assertRaises(QuizSessionInterrupted) as context:
+            service.play(quizzes)
+
+        partial_result = context.exception.partial_result
+
+        self.assertIsNotNone(partial_result)
+        self.assertEqual(partial_result.correct_count, 1)
+        self.assertEqual(partial_result.hint_used_count, 1)
 
 
 # QuizGame이 하위 서비스를 제대로 호출하는지 테스트합니다.
