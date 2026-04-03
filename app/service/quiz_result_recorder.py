@@ -33,11 +33,12 @@ class QuizResultRecorder:
             result.correct_count,
             result.hint_used_count,
         )
-        runtime_state.best_score, is_new_record = (
-            self.best_score_service.update_best_score(
-                runtime_state.best_score,
-                score,
-            )
+        updated_best_score, is_new_record = self.best_score_service.update_best_score(
+            runtime_state.best_score,
+            score,
         )
-        runtime_state.history.append(self.history_service.create_entry(result, score))
+        runtime_state.record_play_result(
+            updated_best_score,
+            self.history_service.create_entry(result, score),
+        )
         return RecordedQuizResult(score, is_new_record)

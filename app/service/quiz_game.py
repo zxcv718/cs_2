@@ -1,5 +1,4 @@
 import app.config.constants as c
-from app.model.quiz import Quiz
 from app.repository.state_repository import StateRepository
 from app.service.best_score_service import BestScoreService
 from app.service.default_game_state_factory import DefaultGameStateFactory
@@ -18,7 +17,6 @@ from app.service.quiz_session_service import (
 )
 from app.service.quiz_scoring_service import QuizScoringService
 from app.ui.console_ui import ConsoleUI
-from typing import Any, Optional
 
 
 # 전체 프로그램 흐름을 조율하는 메인 서비스입니다.
@@ -61,7 +59,7 @@ class QuizGame:
         self.persistence_service.save_runtime_state(self.runtime_state)
 
     def run(self) -> None:
-        if not self.runtime_state.initialized:
+        if not self.runtime_state.is_initialized():
             self.initialize_state()
 
         has_delete = c.ENABLE_DELETE_MENU
@@ -124,27 +122,3 @@ class QuizGame:
             self.catalog_service,
             self.persistence_service,
         )
-
-    @property
-    def quizzes(self) -> list[Quiz]:
-        return self.runtime_state.quizzes
-
-    @quizzes.setter
-    def quizzes(self, quizzes: list[Quiz]) -> None:
-        self.runtime_state.quizzes = quizzes
-
-    @property
-    def best_score(self) -> Optional[int]:
-        return self.runtime_state.best_score
-
-    @best_score.setter
-    def best_score(self, best_score: Optional[int]) -> None:
-        self.runtime_state.best_score = best_score
-
-    @property
-    def history(self) -> list[dict[str, Any]]:
-        return self.runtime_state.history
-
-    @history.setter
-    def history(self, history: list[dict[str, Any]]) -> None:
-        self.runtime_state.history = history

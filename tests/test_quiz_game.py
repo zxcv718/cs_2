@@ -347,9 +347,11 @@ class QuizGameTestCase(unittest.TestCase):
     # persist_state가 저장소에 저장을 위임하는지 확인합니다.
     def test_persist_state_delegates_to_state_repository(self):
         game = self.make_game()
-        game.quizzes = [QuizFactory().create("문제", ["A", "B", "C", "D"], 1)]
-        game.best_score = 50
-        game.history = []
+        game.runtime_state.restore(
+            [QuizFactory().create("문제", ["A", "B", "C", "D"], 1)],
+            50,
+            [],
+        )
 
         game.persist_state()
 
@@ -372,9 +374,9 @@ class QuizGameTestCase(unittest.TestCase):
 
         game.initialize_state()
 
-        self.assertGreaterEqual(len(game.quizzes), 5)
-        self.assertIsNone(game.best_score)
-        self.assertEqual(game.history, [])
+        self.assertGreaterEqual(len(game.runtime_state.quizzes), 5)
+        self.assertIsNone(game.runtime_state.best_score)
+        self.assertEqual(game.runtime_state.history, [])
         self.assertTrue(ui.messages)
 
     # 저장 파일이 잘못되면 오류를 표시하고 복구해야 합니다.
@@ -384,7 +386,7 @@ class QuizGameTestCase(unittest.TestCase):
 
         game.initialize_state()
 
-        self.assertGreaterEqual(len(game.quizzes), 5)
+        self.assertGreaterEqual(len(game.runtime_state.quizzes), 5)
         self.assertTrue(ui.errors)
 
     def test_run_persists_partial_result_when_session_is_interrupted(self):
