@@ -4,16 +4,16 @@ import random
 from datetime import datetime
 from typing import Any
 
-import app.infrastructure.constants as c
-from app.domain.quiz import Quiz
-from app.infrastructure.state_manager import StateManager
+import app.config.constants as c
+from app.model.quiz import Quiz
+from app.repository.state_repository import StateRepository
 from app.ui.console_ui import ConsoleUI
 
 
 class QuizGame:
-    def __init__(self, ui: ConsoleUI, state_manager: StateManager) -> None:
+    def __init__(self, ui: ConsoleUI, state_repository: StateRepository) -> None:
         self.ui = ui
-        self.state_manager = state_manager
+        self.state_repository = state_repository
         self.quizzes: list[Quiz] = []
         self.best_score: int | None = None
         self.history: list[dict[str, Any]] = []
@@ -33,7 +33,7 @@ class QuizGame:
 
     def initialize_state(self) -> None:
         try:
-            state = self.state_manager.load_state()
+            state = self.state_repository.load_state()
             self.quizzes = state[c.STATE_KEY_QUIZZES]
             self.best_score = state[c.STATE_KEY_BEST_SCORE]
             self.history = state.get(c.STATE_KEY_HISTORY, [])
@@ -59,7 +59,7 @@ class QuizGame:
 
     def persist_state(self) -> None:
         try:
-            self.state_manager.save_state(self.quizzes, self.best_score, self.history)
+            self.state_repository.save_state(self.quizzes, self.best_score, self.history)
         except OSError:
             self.ui.show_error(c.ERROR_STATE_SAVE)
 
@@ -245,4 +245,3 @@ class QuizGame:
                 c.HISTORY_FIELD_HINT_USED_COUNT: hint_used_count,
             }
         )
-

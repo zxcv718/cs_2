@@ -5,11 +5,11 @@ from json import JSONDecodeError
 from pathlib import Path
 from typing import Any
 
-import app.infrastructure.constants as c
-from app.domain.quiz import Quiz
+import app.config.constants as c
+from app.model.quiz import Quiz
 
 
-class StateManager:
+class StateRepository:
     def __init__(self, state_file: str | Path) -> None:
         self.state_file = Path(state_file)
 
@@ -172,4 +172,3 @@ class StateManager:
 
     def _is_int(self, value: Any) -> bool:
         return isinstance(value, int) and not isinstance(value, bool)
-

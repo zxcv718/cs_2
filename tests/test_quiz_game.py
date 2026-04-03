@@ -1,7 +1,7 @@
 import unittest
 
-from app.application.quiz_game import QuizGame
-from app.domain.quiz import Quiz
+from app.model.quiz import Quiz
+from app.service.quiz_game import QuizGame
 
 
 class DummyUI:
@@ -16,7 +16,7 @@ class DummyUI:
         self.errors.append(message)
 
 
-class DummyStateManager:
+class DummyStateRepository:
     def __init__(self):
         self.saved = None
 
@@ -28,24 +28,24 @@ class DummyStateManager:
         }
 
 
-class MissingStateManager(DummyStateManager):
+class MissingStateRepository(DummyStateRepository):
     def load_state(self):
         raise FileNotFoundError
 
 
-class BrokenStateManager(DummyStateManager):
+class BrokenStateRepository(DummyStateRepository):
     def load_state(self):
         raise ValueError("broken")
 
 
-class FailingSaveStateManager(DummyStateManager):
+class FailingSaveStateRepository(DummyStateRepository):
     def save_state(self, quizzes, best_score, history=None):
         raise OSError("save failed")
 
 
 class QuizGameTestCase(unittest.TestCase):
-    def make_game(self, state_manager=None, ui=None):
-        return QuizGame(ui or DummyUI(), state_manager or DummyStateManager())
+    def make_game(self, state_repository=None, ui=None):
+        return QuizGame(ui or DummyUI(), state_repository or DummyStateRepository())
 
     def test_create_default_quizzes_returns_at_least_five_quizzes(self):
         game = self.make_game()
@@ -121,7 +121,7 @@ class QuizGameTestCase(unittest.TestCase):
         self.assertEqual(item["hint_used_count"], 1)
         self.assertIn("played_at", item)
 
-    def test_persist_state_delegates_to_state_manager(self):
+    def test_persist_state_delegates_to_state_repository(self):
         game = self.make_game()
         game.quizzes = [Quiz("문제", ["A", "B", "C", "D"], 1)]
         game.best_score = 50
@@ -129,12 +129,12 @@ class QuizGameTestCase(unittest.TestCase):
 
         game.persist_state()
 
-        self.assertIsNotNone(game.state_manager.saved)
-        self.assertEqual(game.state_manager.saved["best_score"], 50)
+        self.assertIsNotNone(game.state_repository.saved)
+        self.assertEqual(game.state_repository.saved["best_score"], 50)
 
     def test_persist_state_reports_save_error(self):
         ui = DummyUI()
-        game = self.make_game(state_manager=FailingSaveStateManager(), ui=ui)
+        game = self.make_game(state_repository=FailingSaveStateRepository(), ui=ui)
 
         game.persist_state()
 
@@ -142,7 +142,7 @@ class QuizGameTestCase(unittest.TestCase):
 
     def test_initialize_state_uses_defaults_when_file_missing(self):
         ui = DummyUI()
-        game = self.make_game(state_manager=MissingStateManager(), ui=ui)
+        game = self.make_game(state_repository=MissingStateRepository(), ui=ui)
 
         game.initialize_state()
 
@@ -153,7 +153,7 @@ class QuizGameTestCase(unittest.TestCase):
 
     def test_initialize_state_recovers_on_value_error(self):
         ui = DummyUI()
-        game = self.make_game(state_manager=BrokenStateManager(), ui=ui)
+        game = self.make_game(state_repository=BrokenStateRepository(), ui=ui)
 
         game.initialize_state()
 

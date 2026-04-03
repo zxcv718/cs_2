@@ -1,6 +1,6 @@
 import unittest
 
-from app.domain.quiz import Quiz
+from app.model.quiz import Quiz
 
 
 class QuizTestCase(unittest.TestCase):

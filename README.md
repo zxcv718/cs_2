@@ -44,43 +44,75 @@ python3 -m unittest discover -s tests
 - 첫 실행에서 `state.json`이 없으면 기본 퀴즈 데이터로 시작합니다.
 - 실행 중 퀴즈를 추가하거나 삭제하면 변경 내용이 `state.json`에 저장됩니다.
 - `Ctrl+C` 또는 입력 종료가 발생해도 가능한 범위에서 저장 후 종료하도록 처리합니다.
-- clone / pull 실습을 위해 복제본에서 README를 한 줄 수정했습니다.
 
 ## 파일 구조
+
+주요 파일 구조는 아래와 같습니다.
 
 ```text
 cs_2/
 ├── main.py
 ├── app/
-│   ├── application/
-│   │   └── quiz_game.py
-│   ├── domain/
+│   ├── __init__.py
+│   ├── config/
+│   │   ├── __init__.py
+│   │   └── constants.py
+│   ├── model/
+│   │   ├── __init__.py
 │   │   └── quiz.py
-│   ├── infrastructure/
-│   │   ├── constants.py
-│   │   └── state_manager.py
+│   ├── service/
+│   │   ├── __init__.py
+│   │   └── quiz_game.py
+│   ├── repository/
+│   │   ├── __init__.py
+│   │   └── state_repository.py
 │   └── ui/
+│       ├── __init__.py
 │       └── console_ui.py
 ├── state.json
 └── tests/
     ├── test_quiz.py
-    ├── test_state_manager.py
+    ├── test_state_repository.py
     └── test_quiz_game.py
 ```
 
 ## 계층 구조 메모
 
-- `app/domain`: 문제 데이터와 정답 규칙
-- `app/application`: 게임 진행 흐름과 상태 관리
-- `app/infrastructure`: 상수와 JSON 저장소 처리
 - `app/ui`: 콘솔 입출력 처리
+- `app/model`: 문제 데이터와 정답 규칙
+- `app/service`: 게임 진행 흐름과 상태 관리
+- `app/repository`: JSON 저장소 접근 처리
+- `app/config`: 상수와 설정값 관리
+
+## 설계 메모
+
+- 구조는 `Layered Architecture + Application Service + Repository + UI 분리` 기준으로 정리했습니다.
+- `Quiz`: 문제 데이터와 정답 판정을 담당하는 모델입니다.
+- `ConsoleUI`: 콘솔 입출력과 입력값 검증을 담당합니다.
+- `QuizGame`: 메뉴 흐름, 점수 계산, 보너스 기능을 조합하는 애플리케이션 서비스입니다.
+- `StateRepository`: `state.json` 저장, 불러오기, 스키마 검증을 담당합니다.
 
 ## 데이터 파일 설명
 
 - 경로: 프로젝트 루트의 `state.json`
 - 역할: 퀴즈 목록, 최고 점수, 플레이 히스토리 저장
 - 생성 시점: 첫 실행 후 자동 생성되거나, 손상 파일 복구 시 재생성됨
-- 기본 스키마:
+- 필수 스키마:
+
+```json
+{
+  "quizzes": [
+    {
+      "question": "Python의 창시자는?",
+      "choices": ["Guido", "Linus", "Bjarne", "James"],
+      "answer": 1
+    }
+  ],
+  "best_score": null
+}
+```
+
+- 보너스 확장 스키마:
 
 ```json
 {

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import app.infrastructure.constants as c
+import app.config.constants as c
 
 
 class Quiz:
@@ -78,4 +78,3 @@ class Quiz:
         if not normalized:
             return None
         return normalized
-

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import app.infrastructure.constants as c
-from app.domain.quiz import Quiz
+import app.config.constants as c
+from app.model.quiz import Quiz
 
 
 class ConsoleUI:
@@ -158,4 +158,3 @@ class ConsoleUI:
         if hint_used_count:
             print(c.RESULT_HINT_USED_TEMPLATE.format(hint_used_count=hint_used_count))
         print(c.PRIMARY_SEPARATOR)
-
