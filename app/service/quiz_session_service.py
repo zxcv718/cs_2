@@ -1,0 +1,123 @@
+import random
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Optional, Tuple
+
+import app.config.constants as c
+from app.model.quiz import Quiz
+from app.ui.console_ui import ConsoleUI
+
+
+# 한 번의 퀴즈 플레이 결과를 묶어서 저장하는 데이터입니다.
+@dataclass(frozen=True)
+class QuizSessionResult:
+    total_questions: int
+    correct_count: int
+    score: int
+    hint_used_count: int
+
+
+# 퀴즈를 실제로 진행하고 점수를 계산하는 서비스입니다.
+class QuizSessionService:
+    def __init__(self, ui: ConsoleUI, hint_penalty: int = c.HINT_PENALTY) -> None:
+        self.ui = ui
+        self.hint_penalty = hint_penalty
+
+    # 퀴즈 플레이 한 번을 끝까지 진행하고 결과를 돌려줍니다.
+    def play(self, quizzes: list[Quiz]) -> Optional[QuizSessionResult]:
+        if not quizzes:
+            self.ui.show_message(c.MESSAGE_NO_QUIZZES)
+            return None
+
+        # 문제 수를 고르고, 그 수만큼 랜덤으로 출제합니다.
+        question_count = self.choose_question_count(len(quizzes))
+        selected_quizzes = self._select_quizzes(quizzes, question_count)
+        correct_count = c.INITIAL_CORRECT_COUNT
+        hint_used_count = c.INITIAL_HINT_USED_COUNT
+
+        for index, quiz in enumerate(selected_quizzes, start=c.DISPLAY_INDEX_START):
+            self.ui.show_question(quiz, index, len(selected_quizzes))
+            used_hint_for_question = False
+
+            while True:
+                # 정답 번호 또는 힌트 명령을 입력받습니다.
+                user_input = self.ui.get_answer_or_hint(
+                    c.PROMPT_ANSWER,
+                    c.MIN_ANSWER,
+                    c.MAX_ANSWER,
+                )
+
+                if user_input == c.HINT_COMMAND_VALUE:
+                    # 힌트가 없거나 이미 썼으면 다시 입력받습니다.
+                    if not quiz.has_hint():
+                        self.ui.show_error(c.ERROR_NO_HINT_FOR_QUESTION)
+                        continue
+                    if used_hint_for_question:
+                        self.ui.show_error(c.ERROR_HINT_ALREADY_USED)
+                        continue
+
+                    # 힌트를 보여주고 감점 횟수를 올립니다.
+                    self.ui.show_message(
+                        c.MESSAGE_HINT_TEMPLATE.format(hint=quiz.get_hint_text())
+                    )
+                    used_hint_for_question = True
+                    hint_used_count += 1
+                    continue
+
+                # 숫자를 입력한 경우 정답 여부를 확인합니다.
+                if quiz.is_correct(user_input):
+                    correct_count += 1
+                    self.ui.show_message(c.MESSAGE_CORRECT_ANSWER)
+                else:
+                    correct_text = quiz.choices[quiz.answer - c.DISPLAY_INDEX_START]
+                    self.ui.show_error(
+                        c.ERROR_WRONG_ANSWER_TEMPLATE.format(
+                            answer=quiz.answer,
+                            correct_text=correct_text,
+                        )
+                    )
+                break
+
+        return QuizSessionResult(
+            total_questions=len(selected_quizzes),
+            correct_count=correct_count,
+            score=self.calculate_score(correct_count, hint_used_count),
+            hint_used_count=hint_used_count,
+        )
+
+    # 몇 문제를 풀지 입력받습니다.
+    def choose_question_count(self, total_questions: int) -> int:
+        return self.ui.get_valid_number(
+            c.PROMPT_QUESTION_COUNT_TEMPLATE.format(count=total_questions),
+            c.DISPLAY_INDEX_START,
+            total_questions,
+        )
+
+    # 정답 점수와 힌트 감점을 반영해 최종 점수를 계산합니다.
+    def calculate_score(self, correct_count: int, hint_used_count: int) -> int:
+        score = correct_count * c.SCORE_PER_CORRECT - hint_used_count * self.hint_penalty
+        return max(c.MINIMUM_SCORE, score)
+
+    # 최고 점수가 갱신됐는지 함께 알려줍니다.
+    def update_best_score(self, best_score: Optional[int], score: int) -> Tuple[int, bool]:
+        if best_score is None or score > best_score:
+            return score, True
+        return best_score, False
+
+    # 플레이 결과를 history에 저장할 딕셔너리로 바꿉니다.
+    def create_history_entry(self, result: QuizSessionResult) -> dict[str, Any]:
+        return {
+            c.HISTORY_FIELD_PLAYED_AT: datetime.now().isoformat(
+                timespec=c.DATETIME_TIMESPEC
+            ),
+            c.HISTORY_FIELD_TOTAL_QUESTIONS: result.total_questions,
+            c.HISTORY_FIELD_CORRECT_COUNT: result.correct_count,
+            c.HISTORY_FIELD_SCORE: result.score,
+            c.HISTORY_FIELD_HINT_USED_COUNT: result.hint_used_count,
+        }
+
+    # 퀴즈 목록을 섞은 뒤 원하는 개수만큼 잘라서 반환합니다.
+    def _select_quizzes(self, quizzes: list[Quiz], question_count: int) -> list[Quiz]:
+        working_quizzes = list(quizzes)
+        random.shuffle(working_quizzes)
+        return working_quizzes[:question_count]
