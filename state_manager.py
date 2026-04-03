@@ -139,10 +139,16 @@ class StateManager:
             if not self._is_int(value) or value < 0:
                 raise ValueError(f"{key} must be a non-negative integer")
 
+        total_questions = item["total_questions"]
+        correct_count = item["correct_count"]
+        if correct_count > total_questions:
+            raise ValueError("correct_count must not exceed total_questions")
+
         hint_used_count = item.get("hint_used_count", 0)
         if not self._is_int(hint_used_count) or hint_used_count < 0:
             raise ValueError("hint_used_count must be a non-negative integer")
+        if hint_used_count > total_questions:
+            raise ValueError("hint_used_count must not exceed total_questions")
 
     def _is_int(self, value: Any) -> bool:
         return isinstance(value, int) and not isinstance(value, bool)
-
