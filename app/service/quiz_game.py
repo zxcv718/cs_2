@@ -3,17 +3,22 @@ from app.model.quiz import Quiz
 from app.repository.state_repository import StateRepository
 from app.service.best_score_service import BestScoreService
 from app.service.default_game_state_factory import DefaultGameStateFactory
+from app.service.game_bootstrap_service import GameBootstrapService
+from app.service.game_persistence_service import GamePersistenceService
+from app.service.game_runtime_state import GameRuntimeState
+from app.service.game_shutdown_service import GameShutdownService
 from app.service.game_state_service import GameStateService
+from app.service.menu_action_dispatcher import MenuActionDispatcher
 from app.service.quiz_history_service import QuizHistoryService
 from app.service.quiz_catalog_service import QuizCatalogService
+from app.service.quiz_result_recorder import QuizResultRecorder
 from app.service.quiz_session_service import (
     QuizSessionInterrupted,
-    QuizSessionResult,
     QuizSessionService,
 )
 from app.service.quiz_scoring_service import QuizScoringService
 from app.ui.console_ui import ConsoleUI
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 
 # 전체 프로그램 흐름을 조율하는 메인 서비스입니다.
@@ -21,174 +26,125 @@ class QuizGame:
     def __init__(self, ui: ConsoleUI, state_repository: StateRepository) -> None:
         self.ui = ui
         self.state_repository = state_repository
-        # 책임을 나눈 하위 서비스들을 함께 사용합니다.
-        self.state_service = GameStateService(state_repository)
+        state_service = GameStateService(state_repository)
+        persistence_service = GamePersistenceService(state_service, ui)
+        result_recorder = QuizResultRecorder(
+            QuizScoringService(),
+            BestScoreService(),
+            QuizHistoryService(),
+        )
+
+        self.runtime_state = GameRuntimeState()
+        self.state_service = state_service
+        self.persistence_service = persistence_service
         self.default_state_factory = DefaultGameStateFactory()
+        self.bootstrap_service = GameBootstrapService(
+            ui,
+            state_service,
+            self.default_state_factory,
+            persistence_service,
+        )
         self.catalog_service = QuizCatalogService(ui)
         self.session_service = QuizSessionService(ui)
-        self.scoring_service = QuizScoringService()
-        self.best_score_service = BestScoreService()
-        self.history_service = QuizHistoryService()
-        self.quizzes: list[Quiz] = []
-        self.best_score: Optional[int] = None
-        self.history: list[dict[str, Any]] = []
-        self._initialized = False
+        self.result_recorder = result_recorder
+        self.shutdown_service = GameShutdownService(
+            ui,
+            persistence_service,
+            result_recorder,
+        )
+        self.menu_dispatcher = MenuActionDispatcher(ui)
 
-    # 저장 파일에서 상태를 읽어 게임 메모리에 올립니다.
     def initialize_state(self) -> None:
-        try:
-            state = self.state_service.load_state()
-        except FileNotFoundError:
-            state = self._recover_with_default_state(
-                self.ui.show_message,
-                c.MESSAGE_STATE_FILE_MISSING,
-                should_save=True,
-            )
-        except ValueError:
-            state = self._recover_with_default_state(
-                self.ui.show_error,
-                c.ERROR_STATE_CORRUPTED,
-                should_save=True,
-            )
-        except OSError:
-            state = self._recover_with_default_state(
-                self.ui.show_error,
-                c.ERROR_STATE_READ,
-                should_save=False,
-            )
+        self.bootstrap_service.initialize(self.runtime_state)
 
-        self._apply_state(state)
-        self._initialized = True
-
-    # 현재 메모리 상태를 파일에 저장합니다.
     def persist_state(self) -> None:
-        try:
-            self.state_service.save_state(self.quizzes, self.best_score, self.history)
-        except OSError:
-            self.ui.show_error(c.ERROR_STATE_SAVE)
+        self.persistence_service.save_runtime_state(self.runtime_state)
 
-    # 메뉴를 반복해서 보여주며 사용자의 선택에 맞는 기능을 실행합니다.
     def run(self) -> None:
-        if not self._initialized:
+        if not self.runtime_state.initialized:
             self.initialize_state()
 
         has_delete = c.ENABLE_DELETE_MENU
-        max_choice = c.MENU_MAX_CHOICE_WITH_DELETE if has_delete else c.MENU_MAX_CHOICE_WITHOUT_DELETE
+        max_choice = (
+            c.MENU_MAX_CHOICE_WITH_DELETE
+            if has_delete
+            else c.MENU_MAX_CHOICE_WITHOUT_DELETE
+        )
 
         while True:
             try:
                 self.ui.show_menu(has_delete=has_delete)
                 choice = self.ui.get_menu_choice(c.MENU_MIN_CHOICE, max_choice)
 
-                # 메뉴 번호를 직접 비교해 분기하면
-                # "입력 -> 기능 실행 -> 다시 메뉴로 복귀" 흐름이 한눈에 보입니다.
-                if choice == c.MENU_PLAY:
-                    self.play_quiz()
-                elif choice == c.MENU_ADD:
-                    self.add_quiz()
-                elif choice == c.MENU_LIST:
-                    self.list_quizzes()
-                elif has_delete and choice == c.MENU_DELETE:
-                    self.delete_quiz()
-                elif (has_delete and choice == c.MENU_SCORE) or (not has_delete and choice == c.MENU_DELETE):
-                    self.show_best_score()
-                elif (has_delete and choice == c.MENU_EXIT) or (not has_delete and choice == c.MENU_SCORE):
-                    self.persist_state()
-                    self.ui.show_message(c.MESSAGE_PROGRAM_EXIT)
+                if not self.menu_dispatcher.dispatch(
+                    choice,
+                    self.runtime_state,
+                    has_delete,
+                    self.catalog_service,
+                    self.session_service,
+                    self.persistence_service,
+                    self.result_recorder,
+                    self.shutdown_service,
+                ):
                     break
             except QuizSessionInterrupted as interrupted:
-                self._commit_interrupted_result(interrupted.partial_result)
-                self.ui.show_message(c.MESSAGE_INTERRUPTED_EXIT)
-                self.persist_state()
+                self.shutdown_service.handle_interrupted_session(
+                    self.runtime_state,
+                    interrupted.partial_result,
+                )
                 break
             except (KeyboardInterrupt, EOFError):
-                # 강제 종료가 들어와도 저장 후 안전하게 끝냅니다.
-                self.ui.show_message(c.MESSAGE_INTERRUPTED_EXIT)
-                self.persist_state()
+                self.shutdown_service.handle_interrupted_program(self.runtime_state)
                 break
 
-    # 퀴즈 플레이를 실행하고 결과를 최고 점수와 기록에 반영합니다.
     def play_quiz(self) -> None:
-        # 실제 문제 출제와 채점은 session_service에 맡기고,
-        # 여기서는 결과를 받아 최고 점수와 history를 갱신합니다.
-        result = self.session_service.play(self.quizzes)
-        if result is None:
-            return
-
-        score, is_new_record = self._record_result(result)
-        self.persist_state()
-        self.ui.show_result(
-            result.correct_count,
-            score,
-            result.total_questions,
-            result.hint_used_count,
+        self.menu_dispatcher.play_quiz(
+            self.runtime_state,
+            self.session_service,
+            self.persistence_service,
+            self.result_recorder,
         )
-        if is_new_record:
-            self.ui.show_message(c.MESSAGE_BEST_SCORE_UPDATED)
 
-    # 새 퀴즈를 추가한 뒤 바로 저장합니다.
     def add_quiz(self) -> None:
-        if self.catalog_service.add_quiz(self.quizzes):
-            self.persist_state()
+        self.menu_dispatcher.add_quiz(
+            self.runtime_state,
+            self.catalog_service,
+            self.persistence_service,
+        )
 
-    # 현재 퀴즈 목록을 화면에 출력합니다.
     def list_quizzes(self) -> None:
-        self.catalog_service.list_quizzes(self.quizzes)
+        self.catalog_service.list_quizzes(self.runtime_state.quizzes)
 
-    # 최고 점수만 따로 확인할 수 있게 보여줍니다.
     def show_best_score(self) -> None:
-        self.ui.show_best_score(self.best_score)
+        self.ui.show_best_score(self.runtime_state.best_score)
 
-    # 퀴즈를 삭제한 경우에만 저장합니다.
     def delete_quiz(self) -> None:
-        if self.catalog_service.delete_quiz(self.quizzes):
-            self.persist_state()
-
-    # 읽어 온 상태를 현재 메모리 상태에 반영합니다.
-    def _apply_state(self, state: dict[str, Any]) -> None:
-        self.quizzes = state[c.STATE_KEY_QUIZZES]
-        self.best_score = state[c.STATE_KEY_BEST_SCORE]
-        self.history = state.get(c.STATE_KEY_HISTORY, [])
-
-    # 기본 상태로 복구하고 필요하면 바로 저장합니다.
-    def _recover_with_default_state(
-        self,
-        notify: Callable[[str], None],
-        message: str,
-        should_save: bool,
-    ) -> dict[str, Any]:
-        notify(message)
-        state = self.default_state_factory.create_state()
-        if should_save:
-            try:
-                self.state_service.save_state(
-                    state[c.STATE_KEY_QUIZZES],
-                    state[c.STATE_KEY_BEST_SCORE],
-                    state[c.STATE_KEY_HISTORY],
-                )
-            except OSError:
-                self.ui.show_error(c.ERROR_STATE_SAVE)
-        return state
-
-    def _record_result(self, result: QuizSessionResult) -> tuple[int, bool]:
-        score = self.scoring_service.calculate_score(
-            result.correct_count,
-            result.hint_used_count,
+        self.menu_dispatcher.delete_quiz(
+            self.runtime_state,
+            self.catalog_service,
+            self.persistence_service,
         )
-        self.best_score, is_new_record = self.best_score_service.update_best_score(
-            self.best_score,
-            score,
-        )
-        self.history.append(self.history_service.create_entry(result, score))
-        return score, is_new_record
 
-    def _commit_interrupted_result(
-        self,
-        result: Optional[QuizSessionResult],
-    ) -> None:
-        if result is None:
-            return
+    @property
+    def quizzes(self) -> list[Quiz]:
+        return self.runtime_state.quizzes
 
-        _, is_new_record = self._record_result(result)
-        if is_new_record:
-            self.ui.show_message(c.MESSAGE_BEST_SCORE_UPDATED)
+    @quizzes.setter
+    def quizzes(self, quizzes: list[Quiz]) -> None:
+        self.runtime_state.quizzes = quizzes
+
+    @property
+    def best_score(self) -> Optional[int]:
+        return self.runtime_state.best_score
+
+    @best_score.setter
+    def best_score(self, best_score: Optional[int]) -> None:
+        self.runtime_state.best_score = best_score
+
+    @property
+    def history(self) -> list[dict[str, Any]]:
+        return self.runtime_state.history
+
+    @history.setter
+    def history(self, history: list[dict[str, Any]]) -> None:
+        self.runtime_state.history = history

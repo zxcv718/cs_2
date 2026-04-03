@@ -2,6 +2,7 @@ import unittest
 
 import app.config.constants as c
 from app.model.quiz import Quiz
+from app.model.quiz_factory import QuizFactory
 from app.service.best_score_service import BestScoreService
 from app.service.default_game_state_factory import DefaultGameStateFactory
 from app.service.game_state_service import GameStateService
@@ -62,9 +63,10 @@ class InterruptingSessionUI(DummyUI):
 # 실제 파일 대신 메모리에 저장 결과를 남기는 가짜 저장소입니다.
 class DummyStateRepository:
     def __init__(self):
+        factory = QuizFactory()
         self.saved = None
         self.loaded_state = {
-            "quizzes": [Quiz("기본 문제", ["A", "B", "C", "D"], 1)],
+            "quizzes": [factory.create("기본 문제", ["A", "B", "C", "D"], 1)],
             "best_score": 10,
             "history": [],
         }
@@ -226,9 +228,10 @@ class QuizSessionServiceTestCase(unittest.TestCase):
     def test_play_raises_interrupted_with_partial_result_after_answer(self):
         ui = InterruptingSessionUI()
         service = DeterministicQuizSessionService(ui)
+        factory = QuizFactory()
         quizzes = [
-            Quiz("문제1", ["A", "B", "C", "D"], 1),
-            Quiz("문제2", ["A", "B", "C", "D"], 2),
+            factory.create("문제1", ["A", "B", "C", "D"], 1),
+            factory.create("문제2", ["A", "B", "C", "D"], 2),
         ]
 
         with self.assertRaises(QuizSessionInterrupted) as context:
@@ -251,7 +254,7 @@ class QuizGameTestCase(unittest.TestCase):
     # persist_state가 저장소에 저장을 위임하는지 확인합니다.
     def test_persist_state_delegates_to_state_repository(self):
         game = self.make_game()
-        game.quizzes = [Quiz("문제", ["A", "B", "C", "D"], 1)]
+        game.quizzes = [QuizFactory().create("문제", ["A", "B", "C", "D"], 1)]
         game.best_score = 50
         game.history = []
 
@@ -294,10 +297,11 @@ class QuizGameTestCase(unittest.TestCase):
     def test_run_persists_partial_result_when_session_is_interrupted(self):
         ui = PlayMenuOnceUI()
         repository = DummyStateRepository()
+        factory = QuizFactory()
         repository.loaded_state = {
             "quizzes": [
-                Quiz("문제1", ["A", "B", "C", "D"], 1),
-                Quiz("문제2", ["A", "B", "C", "D"], 2),
+                factory.create("문제1", ["A", "B", "C", "D"], 1),
+                factory.create("문제2", ["A", "B", "C", "D"], 2),
             ],
             "best_score": None,
             "history": [],

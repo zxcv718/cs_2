@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from app.model.quiz import Quiz
+from app.model.quiz_factory import QuizFactory
 from app.repository.quiz_payload_mapper import QuizPayloadMapper
 from app.repository.state_payload_mapper import StatePayloadMapper
 from app.repository.state_repository import StateRepository
@@ -17,6 +17,7 @@ class StateRepositoryTestCase(unittest.TestCase):
         self.repository = StateRepository(self.state_file)
         self.quiz_mapper = QuizPayloadMapper()
         self.state_mapper = StatePayloadMapper()
+        self.quiz_factory = QuizFactory()
 
     # 테스트가 끝나면 임시 폴더를 정리합니다.
     def tearDown(self):
@@ -32,8 +33,8 @@ class StateRepositoryTestCase(unittest.TestCase):
 
         quiz = self.quiz_mapper.from_payload(item)
 
-        self.assertEqual(quiz.question, "문제")
-        self.assertEqual(quiz.answer, 1)
+        self.assertEqual(quiz.question_text(), "문제")
+        self.assertEqual(quiz.answer_number(), 1)
 
     # 정답 번호가 잘못되면 복원 과정에서 오류가 나야 합니다.
     def test_quiz_payload_mapper_rejects_invalid_answer(self):
@@ -73,19 +74,19 @@ class StateRepositoryTestCase(unittest.TestCase):
 
     # Quiz 객체를 저장용 딕셔너리로 바꿨다가 다시 복원할 수 있어야 합니다.
     def test_quiz_payload_mapper_round_trip_is_consistent(self):
-        quiz = Quiz("문제", ["A", "B", "C", "D"], 2, hint="힌트")
+        quiz = self.quiz_factory.create("문제", ["A", "B", "C", "D"], 2, hint="힌트")
 
         item = self.quiz_mapper.to_payload(quiz)
         restored = self.quiz_mapper.from_payload(item)
 
-        self.assertEqual(restored.question, quiz.question)
-        self.assertEqual(restored.choices, quiz.choices)
-        self.assertEqual(restored.answer, quiz.answer)
-        self.assertEqual(restored.hint, quiz.hint)
+        self.assertEqual(restored.question_text(), quiz.question_text())
+        self.assertEqual(restored.choice_texts(), quiz.choice_texts())
+        self.assertEqual(restored.answer_number(), quiz.answer_number())
+        self.assertEqual(restored.raw_hint(), quiz.raw_hint())
 
     # 저장한 내용을 다시 읽었을 때 값이 유지되는지 확인합니다.
     def test_save_and_load_state_round_trip(self):
-        quizzes = [Quiz("문제", ["A", "B", "C", "D"], 1, hint="힌트")]
+        quizzes = [self.quiz_factory.create("문제", ["A", "B", "C", "D"], 1, hint="힌트")]
 
         self.repository.save_state(
             quizzes,

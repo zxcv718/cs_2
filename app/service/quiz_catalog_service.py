@@ -1,12 +1,19 @@
 import app.config.constants as c
 from app.model.quiz import Quiz
+from app.model.quiz_factory import QuizFactory
 from app.ui.console_ui import ConsoleUI
+from typing import Optional
 
 
 # 퀴즈 추가, 목록 보기, 삭제를 담당하는 서비스입니다.
 class QuizCatalogService:
-    def __init__(self, ui: ConsoleUI) -> None:
+    def __init__(
+        self,
+        ui: ConsoleUI,
+        quiz_factory: Optional[QuizFactory] = None,
+    ) -> None:
         self.ui = ui
+        self.quiz_factory = quiz_factory or QuizFactory()
 
     # 새 퀴즈 정보를 입력받아 목록에 추가합니다.
     def add_quiz(self, quizzes: list[Quiz]) -> bool:
@@ -28,7 +35,7 @@ class QuizCatalogService:
         if self.ui.get_yes_no(c.PROMPT_ADD_HINT_CONFIRM):
             hint = self.ui.get_non_empty_text(c.PROMPT_ENTER_HINT)
 
-        quizzes.append(Quiz(question, choices, answer, hint=hint))
+        quizzes.append(self.quiz_factory.create(question, choices, answer, hint=hint))
         self.ui.show_message(c.MESSAGE_QUIZ_ADDED)
         return True
 
@@ -55,6 +62,8 @@ class QuizCatalogService:
 
         removed_quiz = quizzes.pop(index - c.DISPLAY_INDEX_START)
         self.ui.show_message(
-            c.MESSAGE_DELETE_SUCCESS_TEMPLATE.format(question=removed_quiz.question)
+            c.MESSAGE_DELETE_SUCCESS_TEMPLATE.format(
+                question=removed_quiz.question_text()
+            )
         )
         return True

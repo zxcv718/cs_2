@@ -121,8 +121,16 @@ class ConsoleUI:
         print(c.TITLE_QUIZ_LIST)
         print(c.PRIMARY_SEPARATOR)
         for index, quiz in enumerate(quizzes, start=c.DISPLAY_INDEX_START):
-            print(c.QUIZ_LIST_ITEM_TEMPLATE.format(index=index, question=quiz.question))
-            for choice_index, choice in enumerate(quiz.choices, start=c.DISPLAY_INDEX_START):
+            print(
+                c.QUIZ_LIST_ITEM_TEMPLATE.format(
+                    index=index,
+                    question=quiz.question_text(),
+                )
+            )
+            for choice_index, choice in enumerate(
+                quiz.choice_texts(),
+                start=c.DISPLAY_INDEX_START,
+            ):
                 print(
                     c.QUIZ_LIST_CHOICE_TEMPLATE.format(
                         choice_index=choice_index,
@@ -141,8 +149,17 @@ class ConsoleUI:
     # 현재 출제 중인 문제와 선택지를 출력합니다.
     def show_question(self, quiz: Quiz, index: int, total: int) -> None:
         print(c.SECONDARY_SEPARATOR)
-        print(c.QUESTION_HEADER_TEMPLATE.format(index=index, total=total, question=quiz.question))
-        for choice_index, choice in enumerate(quiz.choices, start=c.DISPLAY_INDEX_START):
+        print(
+            c.QUESTION_HEADER_TEMPLATE.format(
+                index=index,
+                total=total,
+                question=quiz.question_text(),
+            )
+        )
+        for choice_index, choice in enumerate(
+            quiz.choice_texts(),
+            start=c.DISPLAY_INDEX_START,
+        ):
             print(
                 c.QUESTION_CHOICE_TEMPLATE.format(
                     choice_index=choice_index,

@@ -65,7 +65,7 @@ class QuizSessionService:
 
                         # 힌트를 보여주고 감점 횟수를 올립니다.
                         self.ui.show_message(
-                            c.MESSAGE_HINT_TEMPLATE.format(hint=quiz.get_hint_text())
+                            c.MESSAGE_HINT_TEMPLATE.format(hint=quiz.hint_text())
                         )
                         used_hint_for_question = True
                         hint_used_count += 1
@@ -78,11 +78,10 @@ class QuizSessionService:
                         correct_count += 1
                         self.ui.show_message(c.MESSAGE_CORRECT_ANSWER)
                     else:
-                        correct_text = quiz.choices[quiz.answer - c.DISPLAY_INDEX_START]
                         self.ui.show_error(
                             c.ERROR_WRONG_ANSWER_TEMPLATE.format(
-                                answer=quiz.answer,
-                                correct_text=correct_text,
+                                answer=quiz.answer_number(),
+                                correct_text=quiz.correct_choice_text(),
                             )
                         )
                     answered_question_count += 1

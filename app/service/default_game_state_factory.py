@@ -1,7 +1,8 @@
-from typing import Any
+from typing import Any, Optional
 
 import app.config.constants as c
 from app.model.quiz import Quiz
+from app.model.quiz_factory import QuizFactory
 
 
 class DefaultGameStateFactory:
@@ -22,6 +23,9 @@ class DefaultGameStateFactory:
     3. 다른 코드는 생성 과정 대신 "완성된 상태를 사용"하는 데 집중할 수 있습니다.
     """
 
+    def __init__(self, quiz_factory: Optional[QuizFactory] = None) -> None:
+        self.quiz_factory = quiz_factory or QuizFactory()
+
     def create_quizzes(self) -> list[Quiz]:
         """
         상수에 들어 있는 기본 퀴즈 데이터를 Quiz 객체 목록으로 변환합니다.
@@ -30,7 +34,7 @@ class DefaultGameStateFactory:
         이 메서드만 수정하면 되므로 유지보수가 쉬워집니다.
         """
         return [
-            Quiz(
+            self.quiz_factory.create(
                 item[c.QUIZ_FIELD_QUESTION],
                 list(item[c.QUIZ_FIELD_CHOICES]),
                 item[c.QUIZ_FIELD_ANSWER],
