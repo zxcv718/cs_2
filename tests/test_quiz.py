@@ -3,8 +3,8 @@ from typing import Any, cast
 
 from app.model.quiz import Quiz
 from app.model.quiz_factory import QuizFactory
+from app.presentation.quiz_presenter import QuizPresenter
 from app.repository.quiz_payload_mapper import QuizPayloadMapper
-from app.service.quiz_presenter import QuizPresenter
 
 
 # Quiz 클래스의 입력 검증과 기본 동작을 테스트합니다.

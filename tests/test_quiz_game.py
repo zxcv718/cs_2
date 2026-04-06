@@ -5,12 +5,19 @@ import app.config.constants as constants
 from app.model.quiz import Quiz
 from app.model.quiz_catalog import QuizCatalog
 from app.model.quiz_factory import QuizFactory
+from app.console.interface import ConsoleInterface
+from app.application.play.best_score_service import BestScoreService
+from app.application.play.question_count_chooser import QuestionCountChooser
+from app.application.play.quiz_history_service import QuizHistoryService
+from app.application.play.quiz_partial_result_builder import QuizPartialResultBuilder
+from app.application.play.quiz_question_round_service import QuizQuestionRoundService
+from app.application.play.quiz_scoring_service import QuizScoringService
+from app.application.play.quiz_session_models import QuizSessionInterrupted, QuizSessionResult
+from app.application.play.quiz_session_service import QuizSessionService
+from app.application.quiz_game import QuizGame
+from app.application.state.default_game_state_factory import DefaultGameStateFactory
+from app.application.state.game_state_service import GameStateService
 from app.repository.state_repository import StateRepository
-from app.service.best_score_service import BestScoreService
-from app.service.default_game_state_factory import DefaultGameStateFactory
-from app.service.game_state_service import GameStateService
-from app.service.quiz_game import QuizGame
-from app.service.quiz_history_service import QuizHistoryService
 from app.service.quiz_metrics import (
     CorrectAnswerCount,
     DisplayIndex,
@@ -19,13 +26,6 @@ from app.service.quiz_metrics import (
     QuestionCount,
     ScoreValue,
 )
-from app.service.quiz_partial_result_builder import QuizPartialResultBuilder
-from app.service.quiz_question_round_service import QuizQuestionRoundService
-from app.service.quiz_scoring_service import QuizScoringService
-from app.service.question_count_chooser import QuestionCountChooser
-from app.service.quiz_session_models import QuizSessionInterrupted, QuizSessionResult
-from app.service.quiz_session_service import QuizSessionService
-from app.console_interface import ConsoleInterface
 
 
 # 실제 입력 대신 테스트에서 사용할 가짜 UI입니다.

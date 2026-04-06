@@ -1,0 +1,41 @@
+from dataclasses import dataclass
+from typing import Optional
+
+from app.application.play.best_score_service import BestScoreService
+from app.application.play.quiz_scoring_service import QuizScoringService
+from app.application.play.quiz_session_models import QuizSessionResult
+from app.service.quiz_metrics import ScoreValue
+
+
+@dataclass(frozen=True)
+class ScoreRecord:
+    score: ScoreValue
+    best_score: Optional[ScoreValue]
+    is_new_record: bool
+
+
+class QuizScoreKeeper:
+    def __init__(
+        self,
+        scoring_service: QuizScoringService,
+        best_score_service: BestScoreService,
+    ) -> None:
+        self.scoring_service = scoring_service
+        self.best_score_service = best_score_service
+
+    def keep(
+        self,
+        best_score: Optional[ScoreValue],
+        result: QuizSessionResult,
+    ) -> ScoreRecord:
+        scoring_service = self.scoring_service
+        score = scoring_service.calculate_score(
+            result.correct_count,
+            result.hint_used_count,
+        )
+        best_score_service = self.best_score_service
+        updated_best_score, is_new_record = best_score_service.update_best_score(
+            best_score,
+            score,
+        )
+        return ScoreRecord(score, updated_best_score, is_new_record)

@@ -1,6 +1,6 @@
 from app.config.constants import STATE_FILE
-from app.console_interface import ConsoleInterface
-from app.service.quiz_game import QuizGame
+from app.application.quiz_game import QuizGame
+from app.console.interface import ConsoleInterface
 from app.repository.state_repository import StateRepository
 
 
