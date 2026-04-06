@@ -1,5 +1,6 @@
 from app.repository.state_repository import StateRepository
 from app.service.best_score_service import BestScoreService
+from app.service.best_score_display_service import BestScoreDisplayService
 from app.service.default_game_state_factory import DefaultGameStateFactory
 from app.service.default_state_recovery import DefaultStateRecovery
 from app.service.game_bootstrap_service import GameBootstrapService
@@ -11,8 +12,10 @@ from app.service.game_state_service import GameStateService
 from app.service.menu_action_dispatcher import MenuActionDispatcher
 from app.service.menu_execution import MenuExecution
 from app.service.quiz_history_service import QuizHistoryService
-from app.service.quiz_catalog_service import QuizCatalogService
-from app.service.quiz_catalog_workflow import QuizCatalogWorkflow
+from app.service.quiz_catalog_creation_service import QuizCatalogCreationService
+from app.service.quiz_catalog_deletion_service import QuizCatalogDeletionService
+from app.service.quiz_catalog_listing_service import QuizCatalogListingService
+from app.service.quiz_catalog_mutation_workflow import QuizCatalogMutationWorkflow
 from app.service.quiz_game_execution import QuizGameExecution
 from app.service.quiz_game_runner import QuizGameRunner
 from app.service.quiz_play_result_handler import QuizPlayResultHandler
@@ -57,13 +60,17 @@ class QuizGame:
             QuizSessionService(console_interface),
             quiz_play_result_handler,
         )
-        quiz_catalog_workflow = QuizCatalogWorkflow(
-            QuizCatalogService(console_interface),
+        quiz_catalog_mutation_workflow = QuizCatalogMutationWorkflow(
+            QuizCatalogCreationService(console_interface),
+            QuizCatalogDeletionService(console_interface),
             persistence_service,
         )
         menu_execution = MenuExecution(
             quiz_play_workflow,
-            quiz_catalog_workflow,
+            quiz_catalog_mutation_workflow,
+            QuizCatalogListingService(console_interface),
+            BestScoreDisplayService(),
+            persistence_service,
         )
 
         self.runtime_state = GameRuntimeState()

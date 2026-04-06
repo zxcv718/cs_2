@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import app.config.constants as constants
 from app.model.quiz import Quiz
@@ -10,11 +10,6 @@ from app.service.game_history import GameHistory
 from app.service.game_lifecycle import GameLifecycle
 from app.service.game_record_book import GameRecordBook
 from app.service.quiz_metrics import ScoreValue
-
-if TYPE_CHECKING:
-    from app.service.game_bootstrap_service import GameBootstrapService
-    from app.service.game_state_service import GameStateService
-    from app.console_interface import ConsoleInterface
 
 
 @dataclass
@@ -52,38 +47,7 @@ class GameRuntimeState:
         record_book = game_lifecycle.record_book
         record_book.record(best_score, history_entry)
 
-    def initialize_with(
-        self,
-        game_bootstrap_service: GameBootstrapService,
-        console_interface: "ConsoleInterface",
-    ) -> None:
-        game_lifecycle = self.game_lifecycle
-        if game_lifecycle.initialized:
-            return
-        game_bootstrap_service.initialize(self, console_interface)
-
-    def save_with(self, game_state_service: GameStateService) -> None:
-        game_lifecycle = self.game_lifecycle
-        record_book = game_lifecycle.record_book
-        game_state_service.save_state(
-            list(self.quiz_catalog),
-            _score_value_or_none(record_book.best_score),
-            list(record_book.history),
-        )
-
-    def show_best_score_on(self, console_interface: "ConsoleInterface") -> None:
-        game_lifecycle = self.game_lifecycle
-        record_book = game_lifecycle.record_book
-        best_score = _score_value_or_none(record_book.best_score)
-        console_interface.display_best_score(best_score)
-
     def _wrapped_score(self, best_score: int | None) -> ScoreValue | None:
         if best_score is None:
             return None
         return ScoreValue(best_score)
-
-
-def _score_value_or_none(score_value: ScoreValue | None) -> int | None:
-    if score_value is None:
-        return None
-    return int(score_value)

@@ -3,6 +3,8 @@ from typing import Any, cast
 
 from app.model.quiz import Quiz
 from app.model.quiz_factory import QuizFactory
+from app.repository.quiz_payload_mapper import QuizPayloadMapper
+from app.service.quiz_presenter import QuizPresenter
 
 
 # Quiz 클래스의 입력 검증과 기본 동작을 테스트합니다.
@@ -18,7 +20,7 @@ class QuizTestCase(unittest.TestCase):
             answer=1,
             hint="Guido로 시작",
         )
-        payload_item = quiz.payload_item()
+        payload_item = QuizPayloadMapper().to_payload(quiz)
 
         self.assertEqual(payload_item["question"], "Python의 창시자는?")
         self.assertEqual(payload_item["choices"], ["Guido", "Linus", "Bjarne", "James"])
@@ -75,8 +77,9 @@ class QuizTestCase(unittest.TestCase):
     # 힌트 존재 여부와 힌트 문구 반환을 확인합니다.
     def test_has_hint_and_get_hint_text(self):
         quiz = self.factory.create("문제", ["A", "B", "C", "D"], 1, hint="힌트")
+        quiz_presenter = QuizPresenter()
         self.assertTrue(quiz.can_offer_hint())
-        self.assertEqual(quiz.render_hint_message(), "힌트")
+        self.assertEqual(quiz_presenter.hint_message(quiz), "힌트")
 
 
 if __name__ == "__main__":

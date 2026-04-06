@@ -1,13 +1,9 @@
-import random
-
 import app.config.constants as constants
-from app.model.quiz import Quiz
-from app.model.quiz_catalog import QuizCatalog
-from app.service.quiz_metrics import QuestionCount
 from app.console_interface import ConsoleInterface
+from app.service.quiz_metrics import QuestionCount
 
 
-class QuizSelectionService:
+class QuestionCountChooser:
     def __init__(self, console_interface: ConsoleInterface) -> None:
         self.console_interface = console_interface
 
@@ -25,10 +21,3 @@ class QuizSelectionService:
             total_questions,
         )
         return QuestionCount(question_count)
-
-    def select_quizzes(
-        self,
-        quiz_catalog: QuizCatalog,
-        question_count: QuestionCount,
-    ) -> list[Quiz]:
-        return quiz_catalog.randomized_selection(question_count)

@@ -9,6 +9,7 @@ from app.service.quiz_metrics import (
     HintUsageCount,
     QuestionCount,
 )
+from app.service.quiz_presenter import QuizPresenter
 from app.console_interface import ConsoleInterface
 
 
@@ -33,8 +34,13 @@ class QuizQuestionRoundState:
 
 
 class QuizQuestionRoundService:
-    def __init__(self, console_interface: ConsoleInterface) -> None:
+    def __init__(
+        self,
+        console_interface: ConsoleInterface,
+        quiz_presenter: Optional[QuizPresenter] = None,
+    ) -> None:
         self.console_interface = console_interface
+        self.quiz_presenter = quiz_presenter or QuizPresenter()
 
     def play_round(
         self,
@@ -99,9 +105,10 @@ class QuizQuestionRoundService:
             console_interface.show_error(constants.ERROR_HINT_ALREADY_USED)
             return None
 
+        quiz_presenter = self.quiz_presenter
         hint_template = constants.MESSAGE_HINT_TEMPLATE
         hint_message = hint_template.format(
-            hint=quiz.render_hint_message()
+            hint=quiz_presenter.hint_message(quiz)
         )
         console_interface.show_message(hint_message)
         round_state.used_hint_for_question = True
@@ -126,7 +133,9 @@ class QuizQuestionRoundService:
         round_state: QuizQuestionRoundState,
     ) -> QuizQuestionRoundResult:
         console_interface = self.console_interface
-        console_interface.show_error(quiz.render_wrong_answer_message())
+        quiz_presenter = self.quiz_presenter
+        wrong_answer_message = quiz_presenter.wrong_answer_message(quiz)
+        console_interface.show_error(wrong_answer_message)
         return QuizQuestionRoundResult(
             correct_count=CorrectAnswerCount(constants.INITIAL_CORRECT_COUNT),
             hint_used_count=round_state.hint_used_count,

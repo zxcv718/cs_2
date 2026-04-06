@@ -22,7 +22,7 @@ class QuizGameExecution:
         console_interface: ConsoleInterface,
     ) -> None:
         game_bootstrap_service = self.game_bootstrap_service
-        runtime_state.initialize_with(game_bootstrap_service, console_interface)
+        game_bootstrap_service.initialize(runtime_state, console_interface)
 
     def persist_state(self, runtime_state: GameRuntimeState) -> None:
         menu_action_dispatcher = self.menu_action_dispatcher

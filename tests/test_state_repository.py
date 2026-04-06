@@ -32,7 +32,7 @@ class StateRepositoryTestCase(unittest.TestCase):
         }
 
         quiz = self.quiz_mapper.from_payload(item)
-        payload_item = quiz.payload_item()
+        payload_item = self.quiz_mapper.to_payload(quiz)
 
         self.assertEqual(payload_item["question"], "문제")
         self.assertEqual(payload_item["answer"], 1)
@@ -79,8 +79,8 @@ class StateRepositoryTestCase(unittest.TestCase):
 
         item = self.quiz_mapper.to_payload(quiz)
         restored = self.quiz_mapper.from_payload(item)
-        restored_payload = restored.payload_item()
-        original_payload = quiz.payload_item()
+        restored_payload = self.quiz_mapper.to_payload(restored)
+        original_payload = self.quiz_mapper.to_payload(quiz)
 
         self.assertEqual(restored_payload, original_payload)
 

@@ -22,7 +22,7 @@ from app.service.quiz_metrics import (
 from app.service.quiz_partial_result_builder import QuizPartialResultBuilder
 from app.service.quiz_question_round_service import QuizQuestionRoundService
 from app.service.quiz_scoring_service import QuizScoringService
-from app.service.quiz_selection_service import QuizSelectionService
+from app.service.question_count_chooser import QuestionCountChooser
 from app.service.quiz_session_models import QuizSessionInterrupted, QuizSessionResult
 from app.service.quiz_session_service import QuizSessionService
 from app.console_interface import ConsoleInterface
@@ -286,10 +286,10 @@ class QuizHistoryServiceTestCase(unittest.TestCase):
         self.assertIn("played_at", item)
 
 
-class QuizSelectionServiceTestCase(unittest.TestCase):
+class QuestionCountChooserTestCase(unittest.TestCase):
     def test_choose_question_count_delegates_to_ui(self):
         console_interface = InterruptingSessionConsoleInterface()
-        service = QuizSelectionService(console_interface)
+        service = QuestionCountChooser(console_interface)
 
         question_count = service.choose_question_count(5)
 

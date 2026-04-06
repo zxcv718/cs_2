@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Optional
 
 import app.config.constants as constants
-from app.service.quiz_metrics import DisplayIndex, QuestionCount
 
 
 @dataclass(frozen=True)
@@ -101,72 +100,11 @@ class HintText:
             return None
         return cls(normalized)
 
-    def render(self) -> str:
-        return self.value
-
 
 @dataclass(frozen=True)
 class QuizPrompt:
     question_text: QuestionText
     choice_set: ChoiceSet
-
-    def render_question_line(self) -> str:
-        question_text = self.question_text
-        return question_text.value
-
-    def render_choice_lines(self) -> tuple[str, ...]:
-        choice_set = self.choice_set
-        return choice_set.values
-
-    def render_choice_line_for(self, answer_number: "AnswerNumber") -> str:
-        answer = int(answer_number)
-        index = answer - constants.DISPLAY_INDEX_START
-        choice_lines = self.render_choice_lines()
-        return choice_lines[index]
-
-    def render_listing_lines(self, display_index: DisplayIndex) -> tuple[str, ...]:
-        listing_template = constants.QUIZ_LIST_ITEM_TEMPLATE
-        question_line = self.render_question_line()
-        listing_header = listing_template.format(
-            index=int(display_index),
-            question=question_line,
-        )
-        choice_lines = self._listing_choice_lines()
-        return (listing_header, *choice_lines)
-
-    def render_question_lines(
-        self,
-        display_index: DisplayIndex,
-        total_questions: QuestionCount,
-    ) -> tuple[str, ...]:
-        header_template = constants.QUESTION_HEADER_TEMPLATE
-        question_line = self.render_question_line()
-        question_header = header_template.format(
-            index=int(display_index),
-            total=int(total_questions),
-            question=question_line,
-        )
-        choice_lines = self._question_choice_lines()
-        return (question_header, *choice_lines)
-
-    def _listing_choice_lines(self) -> tuple[str, ...]:
-        choice_template = constants.QUIZ_LIST_CHOICE_TEMPLATE
-        return self._choice_lines(choice_template)
-
-    def _question_choice_lines(self) -> tuple[str, ...]:
-        choice_template = constants.QUESTION_CHOICE_TEMPLATE
-        return self._choice_lines(choice_template)
-
-    def _choice_lines(self, choice_template: str) -> tuple[str, ...]:
-        choice_lines = self.render_choice_lines()
-        start = constants.DISPLAY_INDEX_START
-        return tuple(
-            choice_template.format(
-                choice_index=choice_index,
-                choice=choice,
-            )
-            for choice_index, choice in enumerate(choice_lines, start=start)
-        )
 
 
 @dataclass(frozen=True)
@@ -180,18 +118,3 @@ class QuizSolution:
 
     def can_offer_hint(self) -> bool:
         return self.hint_text is not None
-
-    def render_hint_line(self) -> str:
-        if self.hint_text is None:
-            return constants.EMPTY_TEXT
-        hint_text = self.hint_text
-        return hint_text.render()
-
-    def render_wrong_answer_message(self, prompt: QuizPrompt) -> str:
-        answer_number = self.answer_number
-        correct_choice_line = prompt.render_choice_line_for(answer_number)
-        error_template = constants.ERROR_WRONG_ANSWER_TEMPLATE
-        return error_template.format(
-            answer=int(answer_number),
-            correct_text=correct_choice_line,
-        )
