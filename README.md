@@ -171,21 +171,6 @@ app/
 - 직접 리스트 조작 대신 일급 컬렉션 사용
 - 실행 흐름, 저장, 복구, 점수 정책, 콘솔 입출력, 표현 책임 분리
 
-## 주요 리팩터링 포인트
-
-- 기존 top-level 콘솔 모듈을 `app/console` 패키지로 승격
-- flat한 `app/service` 디렉터리를 `application/catalog`, `application/play`, `application/state`, `presentation` 기준으로 재구성
-- `Quiz` 엔티티에서 payload/presentation 성격을 분리하고 mapper/presenter로 이동
-- `GameRuntimeState`에서 bootstrap/save/display helper를 걷어내고 상태 객체 역할에 더 집중
-- 카탈로그 mutation, listing, persistence 연결을 별도 클래스로 분리
-- 의미 있는 chained access와 제어흐름 중첩을 줄여 strict audit 통과
-
-## 엔트리 포인트
-
-- 프로그램 시작: [main.py](/Users/ilim/Downloads/week2/cs_2/main.py)
-- composition root: [quiz_game.py](/Users/ilim/Downloads/week2/cs_2/app/application/quiz_game.py)
-- 콘솔 facade: [interface.py](/Users/ilim/Downloads/week2/cs_2/app/console/interface.py)
-
 ## 데이터 파일
 
 - 저장 파일: `state.json`
