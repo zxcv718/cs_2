@@ -36,14 +36,14 @@ class QuizGameExecution:
         self.initialize_state(runtime_state, console_interface)
         has_delete = constants.ENABLE_DELETE_MENU
         maximum_menu_choice = self._maximum_menu_choice(has_delete)
-        self._run_loop(
+        self._run_once(
             runtime_state,
             has_delete,
             maximum_menu_choice,
             console_interface,
         )
 
-    def _run_loop(
+    def _run_once(
         self,
         runtime_state: GameRuntimeState,
         has_delete: bool,
@@ -51,29 +51,50 @@ class QuizGameExecution:
         console_interface: ConsoleInterface,
     ) -> None:
         menu_action_dispatcher = self.menu_action_dispatcher
-        while True:
-            try:
-                console_interface.show_menu(has_delete=has_delete)
-                menu_choice = console_interface.request_menu_choice(
-                    constants.MENU_MIN_CHOICE,
-                    maximum_menu_choice,
-                )
-                if not menu_action_dispatcher.dispatch(
-                    menu_choice,
-                    runtime_state,
-                    has_delete,
-                    console_interface,
-                ):
-                    return
-            except QuizSessionInterrupted as interrupted:
-                menu_action_dispatcher.handle_interrupted_session(
-                    runtime_state,
-                    interrupted.partial_result,
-                )
-                return
-            except (KeyboardInterrupt, EOFError):
-                menu_action_dispatcher.handle_interrupted_program(runtime_state)
-                return
+        try:
+            should_continue = self._dispatched_once(
+                runtime_state,
+                has_delete,
+                maximum_menu_choice,
+                console_interface,
+            )
+        except QuizSessionInterrupted as interrupted:
+            menu_action_dispatcher.handle_interrupted_session(
+                runtime_state,
+                interrupted.partial_result,
+            )
+            return
+        except (KeyboardInterrupt, EOFError):
+            menu_action_dispatcher.handle_interrupted_program(runtime_state)
+            return
+        if not should_continue:
+            return
+        self._run_once(
+            runtime_state,
+            has_delete,
+            maximum_menu_choice,
+            console_interface,
+        )
+
+    def _dispatched_once(
+        self,
+        runtime_state: GameRuntimeState,
+        has_delete: bool,
+        maximum_menu_choice: int,
+        console_interface: ConsoleInterface,
+    ) -> bool:
+        menu_action_dispatcher = self.menu_action_dispatcher
+        console_interface.show_menu(has_delete=has_delete)
+        menu_choice = console_interface.request_menu_choice(
+            constants.MENU_MIN_CHOICE,
+            maximum_menu_choice,
+        )
+        return menu_action_dispatcher.dispatch(
+            menu_choice,
+            runtime_state,
+            has_delete,
+            console_interface,
+        )
 
     def _maximum_menu_choice(self, has_delete: bool) -> int:
         if has_delete:

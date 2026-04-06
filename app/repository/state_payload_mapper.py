@@ -40,18 +40,21 @@ class StatePayloadMapper:
         if not isinstance(data, dict):
             raise ValueError(constants.ERROR_STATE_MUST_BE_DICTIONARY)
 
-        quizzes_data = data.get(constants.STATE_KEY_QUIZZES)
+        quizzes_key = constants.STATE_KEY_QUIZZES
+        quizzes_data = data.get(quizzes_key)
         if not isinstance(quizzes_data, list):
             raise ValueError(constants.ERROR_STATE_MUST_INCLUDE_QUIZZES)
 
-        if constants.STATE_KEY_BEST_SCORE not in data:
+        best_score_key = constants.STATE_KEY_BEST_SCORE
+        if best_score_key not in data:
             raise ValueError(constants.ERROR_STATE_MUST_INCLUDE_BEST_SCORE)
 
-        best_score = data[constants.STATE_KEY_BEST_SCORE]
+        best_score = data[best_score_key]
         if best_score is not None and not self._is_int(best_score):
             raise ValueError(constants.ERROR_BEST_SCORE_MUST_BE_INTEGER_OR_NONE)
 
-        history_data = data.get(constants.STATE_KEY_HISTORY, [])
+        history_key = constants.STATE_KEY_HISTORY
+        history_data = data.get(history_key, [])
         if not isinstance(history_data, list):
             raise ValueError(constants.ERROR_HISTORY_MUST_BE_LIST)
 
@@ -71,41 +74,14 @@ class StatePayloadMapper:
         if not isinstance(item, dict):
             raise ValueError(constants.ERROR_HISTORY_ITEM_MUST_BE_DICTIONARY)
 
-        raw_played_at = item.get(constants.HISTORY_FIELD_PLAYED_AT)
-        if not isinstance(raw_played_at, str):
-            raise ValueError(constants.ERROR_PLAYED_AT_MUST_BE_NON_EMPTY_STRING)
-        played_at = PlayedAt.from_raw(raw_played_at)
-
-        for key in (
-            constants.HISTORY_FIELD_TOTAL_QUESTIONS,
-            constants.HISTORY_FIELD_CORRECT_COUNT,
-            constants.HISTORY_FIELD_SCORE,
-        ):
-            value = item.get(key)
-            if not self._is_int(value) or value < constants.MINIMUM_SCORE:
-                error_template = constants.ERROR_NON_NEGATIVE_INTEGER_TEMPLATE
-                raise ValueError(
-                    error_template.format(key=key)
-                )
-
-        # "맞힌 문제 수 > 전체 문제 수" 같은 모순된 기록은
-        # 나중에 점수 계산이나 통계 처리에서 문제를 만들 수 있습니다.
-        total_questions = cast(int, item[constants.HISTORY_FIELD_TOTAL_QUESTIONS])
-        correct_count = cast(int, item[constants.HISTORY_FIELD_CORRECT_COUNT])
+        played_at = self._played_at(item)
+        total_questions = self._required_count(item, constants.HISTORY_FIELD_TOTAL_QUESTIONS)
+        correct_count = self._required_count(item, constants.HISTORY_FIELD_CORRECT_COUNT)
+        score = self._required_count(item, constants.HISTORY_FIELD_SCORE)
         if correct_count > total_questions:
             raise ValueError(constants.ERROR_CORRECT_COUNT_EXCEEDS_TOTAL)
 
-        hint_used_count = item.get(
-            constants.HISTORY_FIELD_HINT_USED_COUNT,
-            constants.INITIAL_HINT_USED_COUNT,
-        )
-        if not self._is_int(hint_used_count) or hint_used_count < constants.MINIMUM_SCORE:
-            error_template = constants.ERROR_NON_NEGATIVE_INTEGER_TEMPLATE
-            raise ValueError(
-                error_template.format(
-                    key=constants.HISTORY_FIELD_HINT_USED_COUNT
-                )
-            )
+        hint_used_count = self._hint_used_count(item)
         if hint_used_count > total_questions:
             raise ValueError(constants.ERROR_HINT_USED_COUNT_EXCEEDS_TOTAL)
 
@@ -113,10 +89,33 @@ class StatePayloadMapper:
             constants.HISTORY_FIELD_PLAYED_AT: str(played_at),
             constants.HISTORY_FIELD_TOTAL_QUESTIONS: total_questions,
             constants.HISTORY_FIELD_CORRECT_COUNT: correct_count,
-            constants.HISTORY_FIELD_SCORE: item[constants.HISTORY_FIELD_SCORE],
+            constants.HISTORY_FIELD_SCORE: score,
             constants.HISTORY_FIELD_HINT_USED_COUNT: hint_used_count,
         }
 
     # bool은 int의 하위 타입이라서 따로 제외합니다.
     def _is_int(self, value: Any) -> TypeGuard[int]:
         return isinstance(value, int) and not isinstance(value, bool)
+
+    def _played_at(self, item: dict[str, Any]) -> PlayedAt:
+        played_at_key = constants.HISTORY_FIELD_PLAYED_AT
+        raw_played_at = item.get(played_at_key)
+        if not isinstance(raw_played_at, str):
+            raise ValueError(constants.ERROR_PLAYED_AT_MUST_BE_NON_EMPTY_STRING)
+        return PlayedAt.from_raw(raw_played_at)
+
+    def _required_count(self, item: dict[str, Any], key: str) -> int:
+        value = item.get(key)
+        if not self._is_int(value) or value < constants.MINIMUM_SCORE:
+            error_template = constants.ERROR_NON_NEGATIVE_INTEGER_TEMPLATE
+            raise ValueError(error_template.format(key=key))
+        return cast(int, value)
+
+    def _hint_used_count(self, item: dict[str, Any]) -> int:
+        key = constants.HISTORY_FIELD_HINT_USED_COUNT
+        default_value = constants.INITIAL_HINT_USED_COUNT
+        hint_used_count = item.get(key, default_value)
+        if not self._is_int(hint_used_count) or hint_used_count < constants.MINIMUM_SCORE:
+            error_template = constants.ERROR_NON_NEGATIVE_INTEGER_TEMPLATE
+            raise ValueError(error_template.format(key=key))
+        return hint_used_count

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import app.config.constants as constants
@@ -27,7 +27,9 @@ class QuizQuestionRoundInterrupted(Exception):
 @dataclass
 class QuizQuestionRoundState:
     used_hint_for_question: bool = False
-    hint_used_count: HintUsageCount = HintUsageCount(constants.INITIAL_HINT_USED_COUNT)
+    hint_used_count: HintUsageCount = field(
+        default_factory=lambda: HintUsageCount(constants.INITIAL_HINT_USED_COUNT)
+    )
 
 
 class QuizQuestionRoundService:
@@ -54,11 +56,10 @@ class QuizQuestionRoundService:
         quiz: Quiz,
         round_state: QuizQuestionRoundState,
     ) -> QuizQuestionRoundResult:
-        while True:
-            round_result = self._result_for_next_input(quiz, round_state)
-            if round_result is None:
-                continue
-            return round_result
+        round_result = self._result_for_next_input(quiz, round_state)
+        if round_result is None:
+            return self._play_until_finished(quiz, round_state)
+        return round_result
 
     def _result_for_next_input(
         self,
@@ -98,7 +99,8 @@ class QuizQuestionRoundService:
             console_interface.show_error(constants.ERROR_HINT_ALREADY_USED)
             return None
 
-        hint_message = constants.MESSAGE_HINT_TEMPLATE.format(
+        hint_template = constants.MESSAGE_HINT_TEMPLATE
+        hint_message = hint_template.format(
             hint=quiz.render_hint_message()
         )
         console_interface.show_message(hint_message)

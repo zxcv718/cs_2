@@ -24,18 +24,23 @@ class QuizCatalogService:
         question_prompt = constants.PROMPT_ENTER_QUESTION
         question = console_interface.request_non_empty_text(question_prompt)
         choices = self._choices(console_interface)
+        answer_prompt = self._answer_prompt()
         answer = console_interface.request_valid_number(
-            self._answer_prompt(),
+            answer_prompt,
             constants.MIN_ANSWER,
             constants.MAX_ANSWER,
         )
 
         hint = None
-        if console_interface.request_yes_no(constants.PROMPT_ADD_HINT_CONFIRM):
-            hint = console_interface.request_non_empty_text(constants.PROMPT_ENTER_HINT)
+        hint_confirm_prompt = constants.PROMPT_ADD_HINT_CONFIRM
+        if console_interface.request_yes_no(hint_confirm_prompt):
+            hint_prompt = constants.PROMPT_ENTER_HINT
+            hint = console_interface.request_non_empty_text(hint_prompt)
 
-        quiz_catalog.append(quiz_factory.create(question, choices, answer, hint=hint))
-        console_interface.show_message(constants.MESSAGE_QUIZ_ADDED)
+        created_quiz = quiz_factory.create(question, choices, answer, hint=hint)
+        quiz_catalog.append(created_quiz)
+        added_message = constants.MESSAGE_QUIZ_ADDED
+        console_interface.show_message(added_message)
         return True
 
     # 퀴즈 전체 목록을 화면에 보여줍니다.
@@ -47,22 +52,27 @@ class QuizCatalogService:
     def delete_quiz(self, quiz_catalog: QuizCatalog) -> bool:
         console_interface = self.console_interface
         if not quiz_catalog:
-            console_interface.show_message(constants.MESSAGE_NO_QUIZZES_TO_DELETE)
+            message = constants.MESSAGE_NO_QUIZZES_TO_DELETE
+            console_interface.show_message(message)
             return False
 
         console_interface.show_quiz_list(quiz_catalog)
+        delete_prompt = self._delete_prompt(len(quiz_catalog))
         index = console_interface.request_valid_number(
-            self._delete_prompt(len(quiz_catalog)),
+            delete_prompt,
             constants.DISPLAY_INDEX_START,
             len(quiz_catalog),
         )
 
-        if not console_interface.request_yes_no(constants.PROMPT_DELETE_CONFIRM):
-            console_interface.show_message(constants.MESSAGE_DELETE_CANCELLED)
+        delete_confirm_prompt = constants.PROMPT_DELETE_CONFIRM
+        if not console_interface.request_yes_no(delete_confirm_prompt):
+            cancelled_message = constants.MESSAGE_DELETE_CANCELLED
+            console_interface.show_message(cancelled_message)
             return False
 
         removed_quiz = quiz_catalog.remove_by_display_index(DisplayIndex(index))
-        console_interface.show_message(self._deleted_message(removed_quiz))
+        deleted_message = self._deleted_message(removed_quiz)
+        console_interface.show_message(deleted_message)
         return True
 
     def _choices(self, console_interface: ConsoleInterface) -> list[str]:
@@ -93,6 +103,7 @@ class QuizCatalogService:
 
     def _deleted_message(self, removed_quiz: Quiz) -> str:
         payload_item = removed_quiz.payload_item()
-        question = payload_item[constants.QUIZ_FIELD_QUESTION]
+        question_field = constants.QUIZ_FIELD_QUESTION
+        question = payload_item[question_field]
         template = constants.MESSAGE_DELETE_SUCCESS_TEMPLATE
         return template.format(question=question)

@@ -26,22 +26,28 @@ class ChoiceSet:
 
     @classmethod
     def from_raw(cls, choices: list[str]) -> "ChoiceSet":
-        choice_count = constants.CHOICE_COUNT
-        if not isinstance(choices, list) or len(choices) != choice_count:
-            error_template = constants.ERROR_CHOICES_LENGTH_TEMPLATE
-            raise ValueError(
-                error_template.format(choice_count=choice_count)
-            )
+        validated_choices = cls._validated_choices(choices)
+        normalized_choices = tuple(
+            cls._normalized_choice(choice) for choice in validated_choices
+        )
+        return cls(normalized_choices)
 
-        normalized_choices: list[str] = []
-        for choice in choices:
-            if not isinstance(choice, str):
-                raise ValueError(constants.ERROR_CHOICE_MUST_BE_STRING)
-            normalized = choice.strip()
-            if not normalized:
-                raise ValueError(constants.ERROR_CHOICE_MUST_NOT_BE_EMPTY)
-            normalized_choices.append(normalized)
-        return cls(tuple(normalized_choices))
+    @staticmethod
+    def _validated_choices(choices: list[str]) -> list[str]:
+        choice_count = constants.CHOICE_COUNT
+        if isinstance(choices, list) and len(choices) == choice_count:
+            return choices
+        error_template = constants.ERROR_CHOICES_LENGTH_TEMPLATE
+        raise ValueError(error_template.format(choice_count=choice_count))
+
+    @staticmethod
+    def _normalized_choice(choice: str) -> str:
+        if not isinstance(choice, str):
+            raise ValueError(constants.ERROR_CHOICE_MUST_BE_STRING)
+        normalized = choice.strip()
+        if not normalized:
+            raise ValueError(constants.ERROR_CHOICE_MUST_NOT_BE_EMPTY)
+        return normalized
 
 
 @dataclass(frozen=True)

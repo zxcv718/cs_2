@@ -21,13 +21,9 @@ class ConsoleInterface:
 
     # 메뉴 선택 입력을 숫자로 받습니다.
     def request_menu_choice(self, min_value: int, max_value: int) -> MenuChoice:
-        return MenuChoice(
-            self.request_valid_number(
-                constants.PROMPT_MENU_CHOICE,
-                min_value,
-                max_value,
-            )
-        )
+        prompt = constants.PROMPT_MENU_CHOICE
+        menu_number = self.request_valid_number(prompt, min_value, max_value)
+        return MenuChoice(menu_number)
 
     # 주어진 범위 안의 숫자가 들어올 때까지 반복해서 입력받습니다.
     def request_valid_number(
@@ -60,9 +56,11 @@ class ConsoleInterface:
         return self._answer_or_hint(raw_text, prompt, min_value, max_value)
 
     def _menu_lines(self, has_delete: bool) -> tuple[str, ...]:
-        if has_delete:
-            return constants.MENU_LINES_WITH_DELETE
-        return constants.MENU_LINES_WITHOUT_DELETE
+        menu_lines_by_delete = {
+            True: constants.MENU_LINES_WITH_DELETE,
+            False: constants.MENU_LINES_WITHOUT_DELETE,
+        }
+        return menu_lines_by_delete[has_delete]
 
     def _range_error(self, min_value: int, max_value: int) -> str:
         template = constants.ERROR_RANGE_TEMPLATE
@@ -82,9 +80,10 @@ class ConsoleInterface:
         min_value: int,
         max_value: int,
     ) -> int:
+        show_error = self.show_error
         normalized = raw.strip()
         if not normalized:
-            self.show_error(constants.ERROR_EMPTY_INPUT)
+            show_error(constants.ERROR_EMPTY_INPUT)
             return self.request_valid_number(prompt, min_value, max_value)
         return self._parsed_number(normalized, prompt, min_value, max_value)
 
@@ -95,10 +94,11 @@ class ConsoleInterface:
         min_value: int,
         max_value: int,
     ) -> int:
+        show_error = self.show_error
         try:
             value = int(normalized)
         except ValueError:
-            self.show_error(constants.ERROR_ENTER_NUMBER)
+            show_error(constants.ERROR_ENTER_NUMBER)
             return self.request_valid_number(prompt, min_value, max_value)
         return self._number_in_range(value, prompt, min_value, max_value)
 
@@ -109,26 +109,30 @@ class ConsoleInterface:
         min_value: int,
         max_value: int,
     ) -> int:
+        show_error = self.show_error
         if value < min_value or value > max_value:
-            self.show_error(self._range_error(min_value, max_value))
+            range_error = self._range_error(min_value, max_value)
+            show_error(range_error)
             return self.request_valid_number(prompt, min_value, max_value)
         return value
 
     def _non_empty_text(self, raw_text: str, prompt: str) -> str:
+        show_error = self.show_error
         value = raw_text.strip()
         if not value:
-            self.show_error(constants.ERROR_EMPTY_INPUT)
+            show_error(constants.ERROR_EMPTY_INPUT)
             return self.request_non_empty_text(prompt)
         return value
 
     def _yes_or_no(self, raw_text: str, prompt: str) -> bool:
+        show_error = self.show_error
         normalized = raw_text.strip()
         value = normalized.lower()
         if value in constants.YES_TOKENS:
             return True
         if value in constants.NO_TOKENS:
             return False
-        self.show_error(constants.ERROR_YES_NO_INPUT)
+        show_error(constants.ERROR_YES_NO_INPUT)
         return self.request_yes_no(prompt)
 
     def _answer_or_hint(
@@ -138,10 +142,11 @@ class ConsoleInterface:
         min_value: int,
         max_value: int,
     ) -> Union[int, str]:
+        show_error = self.show_error
         normalized = raw_text.strip()
         value = normalized.lower()
         if not value:
-            self.show_error(constants.ERROR_EMPTY_INPUT)
+            show_error(constants.ERROR_EMPTY_INPUT)
             return self.request_answer_or_hint(prompt, min_value, max_value)
         if value in constants.HINT_TOKENS:
             return constants.HINT_COMMAND_VALUE
@@ -154,10 +159,11 @@ class ConsoleInterface:
         min_value: int,
         max_value: int,
     ) -> Union[int, str]:
+        show_error = self.show_error
         try:
             number = int(value)
         except ValueError:
-            self.show_error(constants.ERROR_ANSWER_OR_HINT_INPUT)
+            show_error(constants.ERROR_ANSWER_OR_HINT_INPUT)
             return self.request_answer_or_hint(prompt, min_value, max_value)
         return self._answer_in_range(number, prompt, min_value, max_value)
 
@@ -168,8 +174,10 @@ class ConsoleInterface:
         min_value: int,
         max_value: int,
     ) -> Union[int, str]:
+        show_error = self.show_error
         if number < min_value or number > max_value:
-            self.show_error(self._range_error(min_value, max_value))
+            range_error = self._range_error(min_value, max_value)
+            show_error(range_error)
             return self.request_answer_or_hint(prompt, min_value, max_value)
         return number
 
@@ -183,8 +191,9 @@ class ConsoleInterface:
 
     # 저장된 퀴즈 목록을 보기 좋게 출력합니다.
     def show_quiz_list(self, quiz_catalog: QuizCatalog) -> None:
+        show_message = self.show_message
         if not quiz_catalog:
-            self.show_message(constants.MESSAGE_NO_QUIZZES)
+            show_message(constants.MESSAGE_NO_QUIZZES)
             return
 
         separator = constants.PRIMARY_SEPARATOR
@@ -211,7 +220,8 @@ class ConsoleInterface:
         total: QuestionCount,
     ) -> None:
         print(constants.SECONDARY_SEPARATOR)
-        self._print_lines(quiz.render_question_lines(index, total))
+        question_lines = quiz.render_question_lines(index, total)
+        self._print_lines(question_lines)
         self._hint_instruction(quiz)
         print(constants.SECONDARY_SEPARATOR)
 
@@ -245,7 +255,8 @@ class ConsoleInterface:
             start=constants.DISPLAY_INDEX_START,
         ):
             display_index = DisplayIndex(raw_index)
-            self._print_lines(quiz.render_listing_lines(display_index))
+            listing_lines = quiz.render_listing_lines(display_index)
+            self._print_lines(listing_lines)
 
     def _hint_instruction(self, quiz: Quiz) -> None:
         if not quiz.can_offer_hint():

@@ -17,7 +17,8 @@ class QuizSelectionService:
 
     def choose_question_count(self, total_questions: int) -> QuestionCount:
         console_interface = self.console_interface
-        prompt = constants.PROMPT_QUESTION_COUNT_TEMPLATE.format(count=total_questions)
+        prompt_template = constants.PROMPT_QUESTION_COUNT_TEMPLATE
+        prompt = prompt_template.format(count=total_questions)
         question_count = console_interface.request_valid_number(
             prompt,
             constants.DISPLAY_INDEX_START,

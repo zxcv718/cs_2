@@ -48,7 +48,8 @@ class GameRuntimeState:
         best_score: ScoreValue | None,
         history_entry: dict[str, Any],
     ) -> None:
-        record_book = self.game_lifecycle.record_book
+        game_lifecycle = self.game_lifecycle
+        record_book = game_lifecycle.record_book
         record_book.record(best_score, history_entry)
 
     def initialize_with(
@@ -62,7 +63,8 @@ class GameRuntimeState:
         game_bootstrap_service.initialize(self, console_interface)
 
     def save_with(self, game_state_service: GameStateService) -> None:
-        record_book = self.game_lifecycle.record_book
+        game_lifecycle = self.game_lifecycle
+        record_book = game_lifecycle.record_book
         game_state_service.save_state(
             list(self.quiz_catalog),
             _score_value_or_none(record_book.best_score),
@@ -70,7 +72,8 @@ class GameRuntimeState:
         )
 
     def show_best_score_on(self, console_interface: "ConsoleInterface") -> None:
-        record_book = self.game_lifecycle.record_book
+        game_lifecycle = self.game_lifecycle
+        record_book = game_lifecycle.record_book
         best_score = _score_value_or_none(record_book.best_score)
         console_interface.display_best_score(best_score)
 

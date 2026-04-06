@@ -21,28 +21,15 @@ class StateRepository:
 
     # 파일에서 게임 상태를 읽어 파이썬 객체로 바꿉니다.
     def load_state(self) -> dict[str, Any]:
-        state_file = self.state_file
         try:
-            with state_file.open(
-                constants.FILE_READ_MODE,
-                encoding=constants.STATE_ENCODING,
-            ) as file:
-                data = json.load(file)
+            data = self._loaded_json()
         except FileNotFoundError:
             raise
         except JSONDecodeError as exc:
             raise ValueError(constants.ERROR_INVALID_JSON_STATE) from exc
         except OSError:
             raise
-
-        # 파일 형식이 맞는지 먼저 검사합니다.
-        # JSON 문법이 맞아도 필요한 키가 빠졌을 수 있으므로
-        # 파싱 성공 뒤에 한 번 더 스키마 검증을 합니다.
-        try:
-            payload_mapper = self.payload_mapper
-            return payload_mapper.from_payload(data)
-        except ValueError as exc:
-            raise ValueError(constants.ERROR_INVALID_STATE_SCHEMA) from exc
+        return self._validated_state(data)
 
     # 현재 게임 상태를 JSON 파일로 저장합니다.
     def save_state(
@@ -69,3 +56,18 @@ class StateRepository:
                 ensure_ascii=constants.STATE_JSON_ENSURE_ASCII,
                 indent=constants.STATE_JSON_INDENT,
             )
+
+    def _loaded_json(self) -> Any:
+        state_file = self.state_file
+        with state_file.open(
+            constants.FILE_READ_MODE,
+            encoding=constants.STATE_ENCODING,
+        ) as file:
+            return json.load(file)
+
+    def _validated_state(self, data: Any) -> dict[str, Any]:
+        payload_mapper = self.payload_mapper
+        try:
+            return payload_mapper.from_payload(data)
+        except ValueError as exc:
+            raise ValueError(constants.ERROR_INVALID_STATE_SCHEMA) from exc
