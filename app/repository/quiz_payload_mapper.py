@@ -14,28 +14,40 @@ class QuizPayloadMapper:
     def to_payload(self, quiz: Quiz) -> dict[str, Any]:
         if not isinstance(quiz, Quiz):
             raise ValueError(c.ERROR_QUIZ_MUST_BE_INSTANCE)
-
-        item = {
-            c.QUIZ_FIELD_QUESTION: quiz.question_text(),
-            c.QUIZ_FIELD_CHOICES: list(quiz.choice_texts()),
-            c.QUIZ_FIELD_ANSWER: quiz.answer_number(),
-        }
-        if quiz.has_hint():
-            item[c.QUIZ_FIELD_HINT] = quiz.hint_text()
-        return item
+        return quiz.payload_item()
 
     # 저장된 딕셔너리를 Quiz 객체로 복원합니다.
     def from_payload(self, item: dict[str, Any]) -> Quiz:
         if not isinstance(item, dict):
             raise ValueError(c.ERROR_QUIZ_ITEM_MUST_BE_DICTIONARY)
 
+        question = item.get(c.QUIZ_FIELD_QUESTION)
+        if not isinstance(question, str) or not question.strip():
+            raise ValueError(c.ERROR_QUESTION_MUST_BE_NON_EMPTY_STRING)
+
+        raw_choices = item.get(c.QUIZ_FIELD_CHOICES)
+        if not isinstance(raw_choices, list) or len(raw_choices) != c.CHOICE_COUNT:
+            raise ValueError(
+                c.ERROR_CHOICES_LENGTH_TEMPLATE.format(choice_count=c.CHOICE_COUNT)
+            )
+
+        choices: list[str] = []
+        for choice in raw_choices:
+            if not isinstance(choice, str) or not choice.strip():
+                raise ValueError(c.ERROR_CHOICE_MUST_BE_NON_EMPTY_STRING)
+            choices.append(choice)
+
+        answer = item.get(c.QUIZ_FIELD_ANSWER)
+        if not isinstance(answer, int) or isinstance(answer, bool):
+            raise ValueError(c.ERROR_ANSWER_MUST_BE_INTEGER)
+
         hint = item.get(c.QUIZ_FIELD_HINT)
         if hint is not None and (not isinstance(hint, str) or not hint.strip()):
             raise ValueError(c.ERROR_HINT_MUST_BE_NON_EMPTY_STRING)
 
         return self.quiz_factory.create(
-            question=item.get(c.QUIZ_FIELD_QUESTION),
-            choices=item.get(c.QUIZ_FIELD_CHOICES),
-            answer=item.get(c.QUIZ_FIELD_ANSWER),
+            question=question,
+            choices=choices,
+            answer=answer,
             hint=hint,
         )

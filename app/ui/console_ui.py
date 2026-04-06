@@ -1,5 +1,6 @@
 import app.config.constants as c
 from app.model.quiz import Quiz
+from app.model.quiz_catalog import QuizCatalog
 from typing import Optional, Union
 
 
@@ -7,7 +8,7 @@ from typing import Optional, Union
 class ConsoleUI:
     # 메인 메뉴를 화면에 출력합니다.
     def show_menu(self, has_delete: bool = False) -> None:
-        menu_lines = c.MENU_LINES_WITH_DELETE if has_delete else c.MENU_LINES_WITHOUT_DELETE
+        menu_lines = self._menu_lines(has_delete)
         print(c.PRIMARY_SEPARATOR)
         print(f"{c.APP_TITLE:^{c.SEPARATOR_LENGTH}}")
         print(c.PRIMARY_SEPARATOR)
@@ -52,7 +53,8 @@ class ConsoleUI:
     # 비어 있지 않은 문자열을 받을 때까지 반복합니다.
     def get_non_empty_text(self, prompt: str) -> str:
         while True:
-            value = input(prompt).strip()
+            raw_text = input(prompt)
+            value = raw_text.strip()
             if not value:
                 self.show_error(c.ERROR_EMPTY_INPUT)
                 continue
@@ -61,7 +63,9 @@ class ConsoleUI:
     # y/yes 또는 n/no 입력을 True/False로 바꿉니다.
     def get_yes_no(self, prompt: str) -> bool:
         while True:
-            value = input(prompt).strip().lower()
+            raw_text = input(prompt)
+            normalized = raw_text.strip()
+            value = normalized.lower()
             if value in c.YES_TOKENS:
                 return True
             if value in c.NO_TOKENS:
@@ -76,7 +80,9 @@ class ConsoleUI:
         max_value: int = c.MAX_ANSWER,
     ) -> Union[int, str]:
         while True:
-            value = input(prompt).strip().lower()
+            raw_text = input(prompt)
+            normalized = raw_text.strip()
+            value = normalized.lower()
 
             if not value:
                 self.show_error(c.ERROR_EMPTY_INPUT)
@@ -103,6 +109,11 @@ class ConsoleUI:
 
             return number
 
+    def _menu_lines(self, has_delete: bool) -> tuple[str, ...]:
+        if has_delete:
+            return c.MENU_LINES_WITH_DELETE
+        return c.MENU_LINES_WITHOUT_DELETE
+
     # 일반 안내 문구를 출력합니다.
     def show_message(self, message: str) -> None:
         print(message)
@@ -112,31 +123,17 @@ class ConsoleUI:
         print(f"{c.ERROR_PREFIX}{message}")
 
     # 저장된 퀴즈 목록을 보기 좋게 출력합니다.
-    def show_quiz_list(self, quizzes: list[Quiz]) -> None:
-        if not quizzes:
+    def show_quiz_list(self, quiz_catalog: QuizCatalog) -> None:
+        if not quiz_catalog.has_items():
             self.show_message(c.MESSAGE_NO_QUIZZES)
             return
 
         print(c.PRIMARY_SEPARATOR)
         print(c.TITLE_QUIZ_LIST)
         print(c.PRIMARY_SEPARATOR)
-        for index, quiz in enumerate(quizzes, start=c.DISPLAY_INDEX_START):
-            print(
-                c.QUIZ_LIST_ITEM_TEMPLATE.format(
-                    index=index,
-                    question=quiz.question_text(),
-                )
-            )
-            for choice_index, choice in enumerate(
-                quiz.choice_texts(),
-                start=c.DISPLAY_INDEX_START,
-            ):
-                print(
-                    c.QUIZ_LIST_CHOICE_TEMPLATE.format(
-                        choice_index=choice_index,
-                        choice=choice,
-                    )
-                )
+        for index, quiz in enumerate(quiz_catalog, start=c.DISPLAY_INDEX_START):
+            for line in quiz.render_listing_lines(index):
+                print(line)
         print(c.PRIMARY_SEPARATOR)
 
     # 최고 점수가 없으면 안내 문구를 보여줍니다.
@@ -149,24 +146,9 @@ class ConsoleUI:
     # 현재 출제 중인 문제와 선택지를 출력합니다.
     def show_question(self, quiz: Quiz, index: int, total: int) -> None:
         print(c.SECONDARY_SEPARATOR)
-        print(
-            c.QUESTION_HEADER_TEMPLATE.format(
-                index=index,
-                total=total,
-                question=quiz.question_text(),
-            )
-        )
-        for choice_index, choice in enumerate(
-            quiz.choice_texts(),
-            start=c.DISPLAY_INDEX_START,
-        ):
-            print(
-                c.QUESTION_CHOICE_TEMPLATE.format(
-                    choice_index=choice_index,
-                    choice=choice,
-                )
-            )
-        if quiz.has_hint():
+        for line in quiz.render_question_lines(index, total):
+            print(line)
+        if quiz.can_offer_hint():
             print(c.MESSAGE_HINT_INSTRUCTION)
         print(c.SECONDARY_SEPARATOR)
 

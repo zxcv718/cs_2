@@ -11,10 +11,10 @@ class QuizHistoryService:
     def create_entry(self, result: QuizSessionResult, score: int) -> dict[str, Any]:
         # played_at을 같이 저장해 두면
         # 나중에 "언제 플레이했는지"를 history에서 확인할 수 있습니다.
+        played_at = datetime.now()
+        played_at_text = played_at.isoformat(timespec=c.DATETIME_TIMESPEC)
         return {
-            c.HISTORY_FIELD_PLAYED_AT: datetime.now().isoformat(
-                timespec=c.DATETIME_TIMESPEC
-            ),
+            c.HISTORY_FIELD_PLAYED_AT: played_at_text,
             c.HISTORY_FIELD_TOTAL_QUESTIONS: result.total_questions,
             c.HISTORY_FIELD_CORRECT_COUNT: result.correct_count,
             c.HISTORY_FIELD_SCORE: score,

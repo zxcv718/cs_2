@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, TypeGuard, cast
 
 import app.config.constants as c
 from app.model.quiz import Quiz
@@ -81,8 +81,8 @@ class StatePayloadMapper:
 
         # "맞힌 문제 수 > 전체 문제 수" 같은 모순된 기록은
         # 나중에 점수 계산이나 통계 처리에서 문제를 만들 수 있습니다.
-        total_questions = item[c.HISTORY_FIELD_TOTAL_QUESTIONS]
-        correct_count = item[c.HISTORY_FIELD_CORRECT_COUNT]
+        total_questions = cast(int, item[c.HISTORY_FIELD_TOTAL_QUESTIONS])
+        correct_count = cast(int, item[c.HISTORY_FIELD_CORRECT_COUNT])
         if correct_count > total_questions:
             raise ValueError(c.ERROR_CORRECT_COUNT_EXCEEDS_TOTAL)
 
@@ -108,5 +108,5 @@ class StatePayloadMapper:
         }
 
     # bool은 int의 하위 타입이라서 따로 제외합니다.
-    def _is_int(self, value: Any) -> bool:
+    def _is_int(self, value: Any) -> TypeGuard[int]:
         return isinstance(value, int) and not isinstance(value, bool)

@@ -1,4 +1,5 @@
 import unittest
+from typing import Any, cast
 
 from app.model.quiz import Quiz
 from app.model.quiz_factory import QuizFactory
@@ -17,11 +18,12 @@ class QuizTestCase(unittest.TestCase):
             answer=1,
             hint="Guido로 시작",
         )
+        payload_item = quiz.payload_item()
 
-        self.assertEqual(quiz.question_text(), "Python의 창시자는?")
-        self.assertEqual(quiz.choice_texts(), ("Guido", "Linus", "Bjarne", "James"))
-        self.assertEqual(quiz.answer_number(), 1)
-        self.assertEqual(quiz.raw_hint(), "Guido로 시작")
+        self.assertEqual(payload_item["question"], "Python의 창시자는?")
+        self.assertEqual(payload_item["choices"], ["Guido", "Linus", "Bjarne", "James"])
+        self.assertEqual(payload_item["answer"], 1)
+        self.assertEqual(payload_item["hint"], "Guido로 시작")
 
     # 빈 문제 문장은 허용하지 않아야 합니다.
     def test_quiz_init_rejects_empty_question(self):
@@ -57,24 +59,24 @@ class QuizTestCase(unittest.TestCase):
                 question="문제",
                 choices=["A", "B", "C", "D"],
                 answer=1,
-                hint=123,
+                hint=cast(Any, 123),
             )
 
     # 맞는 번호를 넣으면 True가 나와야 합니다.
     def test_is_correct_returns_true_for_correct_answer(self):
         quiz = self.factory.create("문제", ["A", "B", "C", "D"], 2)
-        self.assertTrue(quiz.is_correct(2))
+        self.assertTrue(quiz.matches(2))
 
     # 틀린 번호를 넣으면 False가 나와야 합니다.
     def test_is_correct_returns_false_for_wrong_answer(self):
         quiz = self.factory.create("문제", ["A", "B", "C", "D"], 2)
-        self.assertFalse(quiz.is_correct(3))
+        self.assertFalse(quiz.matches(3))
 
     # 힌트 존재 여부와 힌트 문구 반환을 확인합니다.
     def test_has_hint_and_get_hint_text(self):
         quiz = self.factory.create("문제", ["A", "B", "C", "D"], 1, hint="힌트")
-        self.assertTrue(quiz.has_hint())
-        self.assertEqual(quiz.hint_text(), "힌트")
+        self.assertTrue(quiz.can_offer_hint())
+        self.assertEqual(quiz.render_hint_message(), "힌트")
 
 
 if __name__ == "__main__":

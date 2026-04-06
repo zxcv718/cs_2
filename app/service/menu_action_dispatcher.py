@@ -1,95 +1,61 @@
 import app.config.constants as c
-from app.service.game_persistence_service import GamePersistenceService
 from app.service.game_runtime_state import GameRuntimeState
 from app.service.game_shutdown_service import GameShutdownService
-from app.service.quiz_catalog_service import QuizCatalogService
-from app.service.quiz_result_recorder import QuizResultRecorder
-from app.service.quiz_session_service import QuizSessionService
+from app.service.menu_execution import MenuExecution
 from app.ui.console_ui import ConsoleUI
 
 
 class MenuActionDispatcher:
-    def __init__(self, ui: ConsoleUI) -> None:
-        self.ui = ui
+    def __init__(
+        self,
+        menu_execution: MenuExecution,
+        game_shutdown_service: GameShutdownService,
+    ) -> None:
+        self.menu_execution = menu_execution
+        self.game_shutdown_service = game_shutdown_service
 
     def dispatch(
         self,
         choice: int,
         runtime_state: GameRuntimeState,
         has_delete: bool,
-        catalog_service: QuizCatalogService,
-        session_service: QuizSessionService,
-        persistence_service: GamePersistenceService,
-        result_recorder: QuizResultRecorder,
-        shutdown_service: GameShutdownService,
+        console_interface: ConsoleUI,
     ) -> bool:
         if choice == c.MENU_PLAY:
-            self.play_quiz(
-                runtime_state,
-                session_service,
-                persistence_service,
-                result_recorder,
-            )
+            self.menu_execution.play(console_interface, runtime_state)
             return True
 
         if choice == c.MENU_ADD:
-            self.add_quiz(runtime_state, catalog_service, persistence_service)
+            self.menu_execution.add(runtime_state)
             return True
 
         if choice == c.MENU_LIST:
-            catalog_service.list_quizzes(runtime_state.quizzes)
+            self.menu_execution.show_list(runtime_state)
             return True
 
         if has_delete and choice == c.MENU_DELETE:
-            self.delete_quiz(runtime_state, catalog_service, persistence_service)
+            self.menu_execution.delete(runtime_state)
             return True
 
         if self._is_score_choice(choice, has_delete):
-            self.ui.show_best_score(runtime_state.best_score)
+            self.menu_execution.show_best_score(console_interface, runtime_state)
             return True
 
-        shutdown_service.handle_normal_exit(runtime_state)
+        self.game_shutdown_service.handle_normal_exit(runtime_state)
         return False
 
-    def play_quiz(
+    def persist(self, runtime_state: GameRuntimeState) -> None:
+        self.menu_execution.persist(runtime_state)
+
+    def handle_interrupted_session(
         self,
         runtime_state: GameRuntimeState,
-        session_service: QuizSessionService,
-        persistence_service: GamePersistenceService,
-        result_recorder: QuizResultRecorder,
+        result,
     ) -> None:
-        result = session_service.play(runtime_state.quizzes)
-        if result is None:
-            return
+        self.game_shutdown_service.handle_interrupted_session(runtime_state, result)
 
-        recorded_result = result_recorder.record(runtime_state, result)
-        persistence_service.save_runtime_state(runtime_state)
-        self.ui.show_result(
-            result.correct_count,
-            recorded_result.score,
-            result.total_questions,
-            result.hint_used_count,
-        )
-        if recorded_result.is_new_record:
-            self.ui.show_message(c.MESSAGE_BEST_SCORE_UPDATED)
-
-    def add_quiz(
-        self,
-        runtime_state: GameRuntimeState,
-        catalog_service: QuizCatalogService,
-        persistence_service: GamePersistenceService,
-    ) -> None:
-        if catalog_service.add_quiz(runtime_state.quizzes):
-            persistence_service.save_runtime_state(runtime_state)
-
-    def delete_quiz(
-        self,
-        runtime_state: GameRuntimeState,
-        catalog_service: QuizCatalogService,
-        persistence_service: GamePersistenceService,
-    ) -> None:
-        if catalog_service.delete_quiz(runtime_state.quizzes):
-            persistence_service.save_runtime_state(runtime_state)
+    def handle_interrupted_program(self, runtime_state: GameRuntimeState) -> None:
+        self.game_shutdown_service.handle_interrupted_program(runtime_state)
 
     def _is_score_choice(self, choice: int, has_delete: bool) -> bool:
         if has_delete:

@@ -1,8 +1,11 @@
 import unittest
+from typing import Optional
 
 import app.config.constants as c
 from app.model.quiz import Quiz
+from app.model.quiz_catalog import QuizCatalog
 from app.model.quiz_factory import QuizFactory
+from app.repository.state_repository import StateRepository
 from app.service.best_score_service import BestScoreService
 from app.service.default_game_state_factory import DefaultGameStateFactory
 from app.service.game_state_service import GameStateService
@@ -12,15 +15,13 @@ from app.service.quiz_partial_result_builder import QuizPartialResultBuilder
 from app.service.quiz_question_round_service import QuizQuestionRoundService
 from app.service.quiz_scoring_service import QuizScoringService
 from app.service.quiz_selection_service import QuizSelectionService
-from app.service.quiz_session_service import (
-    QuizSessionInterrupted,
-    QuizSessionResult,
-    QuizSessionService,
-)
+from app.service.quiz_session_models import QuizSessionInterrupted, QuizSessionResult
+from app.service.quiz_session_service import QuizSessionService
+from app.ui.console_ui import ConsoleUI
 
 
 # 실제 입력 대신 테스트에서 사용할 가짜 UI입니다.
-class DummyUI:
+class DummyUI(ConsoleUI):
     def __init__(self):
         self.messages = []
         self.errors = []
@@ -99,7 +100,7 @@ class AnswerThenHintThenInterruptUI(DummyUI):
 
 
 # 실제 파일 대신 메모리에 저장 결과를 남기는 가짜 저장소입니다.
-class DummyStateRepository:
+class DummyStateRepository(StateRepository):
     def __init__(self):
         factory = QuizFactory()
         self.saved = None
@@ -141,15 +142,15 @@ class FailingSaveStateRepository(DummyStateRepository):
 
 
 class DeterministicQuizSessionService(QuizSessionService):
-    def _select_quizzes(self, quizzes, question_count):
-        return list(quizzes)[:question_count]
+    def _select_quizzes(self, quiz_catalog, question_count):
+        return list(quiz_catalog)[:question_count]
 
 
-class InterruptedSessionService:
+class InterruptedSessionService(QuizSessionService):
     def __init__(self, partial_result):
         self.partial_result = partial_result
 
-    def play(self, quizzes):
+    def play(self, quiz_catalog):
         raise QuizSessionInterrupted(self.partial_result)
 
 
@@ -308,13 +309,15 @@ class QuizSessionServiceTestCase(unittest.TestCase):
             factory.create("문제1", ["A", "B", "C", "D"], 1),
             factory.create("문제2", ["A", "B", "C", "D"], 2),
         ]
+        quiz_catalog = QuizCatalog.from_items(quizzes)
 
         with self.assertRaises(QuizSessionInterrupted) as context:
-            service.play(quizzes)
+            service.play(quiz_catalog)
 
         partial_result = context.exception.partial_result
 
         self.assertIsNotNone(partial_result)
+        assert partial_result is not None
         self.assertEqual(partial_result.total_questions, 2)
         self.assertEqual(partial_result.correct_count, 1)
         self.assertEqual(partial_result.hint_used_count, 0)
@@ -327,13 +330,15 @@ class QuizSessionServiceTestCase(unittest.TestCase):
             factory.create("문제1", ["A", "B", "C", "D"], 1, hint="힌트1"),
             factory.create("문제2", ["A", "B", "C", "D"], 2, hint="힌트2"),
         ]
+        quiz_catalog = QuizCatalog.from_items(quizzes)
 
         with self.assertRaises(QuizSessionInterrupted) as context:
-            service.play(quizzes)
+            service.play(quiz_catalog)
 
         partial_result = context.exception.partial_result
 
         self.assertIsNotNone(partial_result)
+        assert partial_result is not None
         self.assertEqual(partial_result.correct_count, 1)
         self.assertEqual(partial_result.hint_used_count, 1)
 
@@ -341,12 +346,25 @@ class QuizSessionServiceTestCase(unittest.TestCase):
 # QuizGame이 하위 서비스를 제대로 호출하는지 테스트합니다.
 class QuizGameTestCase(unittest.TestCase):
     # 기본 가짜 객체를 붙여 게임 객체를 쉽게 만듭니다.
-    def make_game(self, state_repository=None, ui=None):
-        return QuizGame(ui or DummyUI(), state_repository or DummyStateRepository())
+    def make_game(
+        self,
+        state_repository: Optional[DummyStateRepository] = None,
+        ui: Optional[DummyUI] = None,
+    ) -> QuizGame:
+        console_interface = DummyUI()
+        if ui is not None:
+            console_interface = ui
+
+        repository = DummyStateRepository()
+        if state_repository is not None:
+            repository = state_repository
+
+        return QuizGame(console_interface, repository)
 
     # persist_state가 저장소에 저장을 위임하는지 확인합니다.
     def test_persist_state_delegates_to_state_repository(self):
-        game = self.make_game()
+        repository = DummyStateRepository()
+        game = self.make_game(state_repository=repository)
         game.runtime_state.restore(
             [QuizFactory().create("문제", ["A", "B", "C", "D"], 1)],
             50,
@@ -355,8 +373,9 @@ class QuizGameTestCase(unittest.TestCase):
 
         game.persist_state()
 
-        self.assertIsNotNone(game.state_repository.saved)
-        self.assertEqual(game.state_repository.saved["best_score"], 50)
+        self.assertIsNotNone(repository.saved)
+        assert repository.saved is not None
+        self.assertEqual(repository.saved["best_score"], 50)
 
     # 저장 실패 시 UI에 오류를 보여줘야 합니다.
     def test_persist_state_reports_save_error(self):
@@ -374,9 +393,12 @@ class QuizGameTestCase(unittest.TestCase):
 
         game.initialize_state()
 
-        self.assertGreaterEqual(len(game.runtime_state.quizzes), 5)
-        self.assertIsNone(game.runtime_state.best_score)
-        self.assertEqual(game.runtime_state.history, [])
+        self.assertGreaterEqual(len(game.runtime_state.quiz_catalog), 5)
+        self.assertIsNone(game.runtime_state.game_lifecycle.record_book.best_score)
+        self.assertEqual(
+            game.runtime_state.game_lifecycle.record_book.history.persistable_entries(),
+            [],
+        )
         self.assertTrue(ui.messages)
 
     # 저장 파일이 잘못되면 오류를 표시하고 복구해야 합니다.
@@ -386,7 +408,7 @@ class QuizGameTestCase(unittest.TestCase):
 
         game.initialize_state()
 
-        self.assertGreaterEqual(len(game.runtime_state.quizzes), 5)
+        self.assertGreaterEqual(len(game.runtime_state.quiz_catalog), 5)
         self.assertTrue(ui.errors)
 
     def test_run_persists_partial_result_when_session_is_interrupted(self):
@@ -402,7 +424,7 @@ class QuizGameTestCase(unittest.TestCase):
             "history": [],
         }
         game = self.make_game(state_repository=repository, ui=ui)
-        game.session_service = InterruptedSessionService(
+        game.quiz_game_runner.quiz_game_execution.menu_action_dispatcher.menu_execution.quiz_play_workflow.quiz_session_service = InterruptedSessionService(
             QuizSessionResult(
                 total_questions=2,
                 correct_count=1,
@@ -413,6 +435,7 @@ class QuizGameTestCase(unittest.TestCase):
         game.run()
 
         self.assertIsNotNone(repository.saved)
+        assert repository.saved is not None
         self.assertEqual(repository.saved["best_score"], 10)
         self.assertEqual(len(repository.saved["history"]), 1)
         self.assertEqual(repository.saved["history"][0]["correct_count"], 1)

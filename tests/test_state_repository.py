@@ -32,9 +32,10 @@ class StateRepositoryTestCase(unittest.TestCase):
         }
 
         quiz = self.quiz_mapper.from_payload(item)
+        payload_item = quiz.payload_item()
 
-        self.assertEqual(quiz.question_text(), "문제")
-        self.assertEqual(quiz.answer_number(), 1)
+        self.assertEqual(payload_item["question"], "문제")
+        self.assertEqual(payload_item["answer"], 1)
 
     # 정답 번호가 잘못되면 복원 과정에서 오류가 나야 합니다.
     def test_quiz_payload_mapper_rejects_invalid_answer(self):
@@ -78,11 +79,10 @@ class StateRepositoryTestCase(unittest.TestCase):
 
         item = self.quiz_mapper.to_payload(quiz)
         restored = self.quiz_mapper.from_payload(item)
+        restored_payload = restored.payload_item()
+        original_payload = quiz.payload_item()
 
-        self.assertEqual(restored.question_text(), quiz.question_text())
-        self.assertEqual(restored.choice_texts(), quiz.choice_texts())
-        self.assertEqual(restored.answer_number(), quiz.answer_number())
-        self.assertEqual(restored.raw_hint(), quiz.raw_hint())
+        self.assertEqual(restored_payload, original_payload)
 
     # 저장한 내용을 다시 읽었을 때 값이 유지되는지 확인합니다.
     def test_save_and_load_state_round_trip(self):

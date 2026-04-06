@@ -1,7 +1,14 @@
 from typing import Optional
 
 from app.model.quiz import Quiz
-from app.model.quiz_components import AnswerNumber, ChoiceSet, HintText, QuestionText
+from app.model.quiz_components import (
+    AnswerNumber,
+    ChoiceSet,
+    HintText,
+    QuestionText,
+    QuizPrompt,
+    QuizSolution,
+)
 
 
 class QuizFactory:
@@ -19,8 +26,6 @@ class QuizFactory:
         hint_text = HintText.from_raw(hint)
 
         return Quiz(
-            question_text.value,
-            choice_set.values,
-            answer_number.value,
-            None if hint_text is None else hint_text.value,
+            QuizPrompt(question_text, choice_set),
+            QuizSolution(answer_number, hint_text),
         )

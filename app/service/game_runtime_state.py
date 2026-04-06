@@ -1,19 +1,25 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import app.config.constants as c
 from app.model.quiz import Quiz
+from app.model.quiz_catalog import QuizCatalog
+from app.service.game_history import GameHistory
+from app.service.game_lifecycle import GameLifecycle
+from app.service.game_record_book import GameRecordBook
+
+if TYPE_CHECKING:
+    from app.service.game_bootstrap_service import GameBootstrapService
+    from app.service.game_state_service import GameStateService
+    from app.ui.console_ui import ConsoleUI
 
 
 @dataclass
 class GameRuntimeState:
-    quizzes: list[Quiz] = field(default_factory=list)
-    best_score: Optional[int] = None
-    history: list[dict[str, Any]] = field(default_factory=list)
-    initialized: bool = False
-
-    def is_initialized(self) -> bool:
-        return self.initialized
+    quiz_catalog: QuizCatalog = field(default_factory=QuizCatalog)
+    game_lifecycle: GameLifecycle = field(default_factory=GameLifecycle.create_uninitialized)
 
     def restore(
         self,
@@ -21,10 +27,10 @@ class GameRuntimeState:
         best_score: Optional[int],
         history: list[dict[str, Any]],
     ) -> None:
-        self.quizzes = quizzes
-        self.best_score = best_score
-        self.history = history
-        self.initialized = True
+        self.quiz_catalog = QuizCatalog.from_items(quizzes)
+        history_entries = GameHistory.from_entries(history)
+        record_book = GameRecordBook(best_score, history_entries)
+        self.game_lifecycle = GameLifecycle(record_book, True)
 
     def apply_loaded_state(self, state: dict[str, Any]) -> None:
         self.restore(
@@ -38,5 +44,23 @@ class GameRuntimeState:
         best_score: Optional[int],
         history_entry: dict[str, Any],
     ) -> None:
-        self.best_score = best_score
-        self.history.append(history_entry)
+        self.game_lifecycle.record_book.record(best_score, history_entry)
+
+    def initialize_with(
+        self,
+        game_bootstrap_service: GameBootstrapService,
+        console_interface: ConsoleUI,
+    ) -> None:
+        if self.game_lifecycle.initialized:
+            return
+        game_bootstrap_service.initialize(self, console_interface)
+
+    def save_with(self, game_state_service: GameStateService) -> None:
+        game_state_service.save_state(
+            self.quiz_catalog.persistable_items(),
+            self.game_lifecycle.record_book.best_score,
+            self.game_lifecycle.record_book.history.persistable_entries(),
+        )
+
+    def show_best_score_on(self, console_interface: ConsoleUI) -> None:
+        console_interface.show_best_score(self.game_lifecycle.record_book.best_score)
