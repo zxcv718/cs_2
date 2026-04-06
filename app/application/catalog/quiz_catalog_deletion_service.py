@@ -40,6 +40,8 @@ class QuizCatalogDeletionService:
         return template.format(count=quiz_count)
 
     def _deleted_message(self, removed_quiz) -> str:
-        question = removed_quiz.question_text()
+        prompt = removed_quiz.prompt
+        question_text = prompt.question_text
+        question = str(question_text)
         template = constants.MESSAGE_DELETE_SUCCESS_TEMPLATE
         return template.format(question=question)

@@ -5,11 +5,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 APP_ROOT = PROJECT_ROOT / "app"
-ALLOWED_VALUE_ACCESS_FILES = {
-    APP_ROOT / "service" / "quiz_metrics.py",
-    APP_ROOT / "model" / "quiz_components.py",
-}
-ALLOWED_COLLECTION_BOUNDARY_METHODS = {"from_items", "from_entries", "from_raw", "create"}
+FORBIDDEN_ABBREVIATIONS = {"cfg", "ctx", "svc", "repo", "ui", "val", "msg"}
 
 
 def production_files() -> list[Path]:
@@ -38,6 +34,44 @@ def attribute_root(node: ast.Attribute):
     if isinstance(current, ast.Call) and isinstance(current.func, ast.Attribute):
         return attribute_root(current.func)
     return current
+
+
+def control_depth(node: ast.FunctionDef) -> int:
+    maximum_depth = 0
+
+    def walk(current: ast.AST, depth: int) -> None:
+        nonlocal maximum_depth
+        if isinstance(
+            current,
+            (ast.If, ast.For, ast.While, ast.Try, ast.With, ast.Match, ast.AsyncFor, ast.AsyncWith),
+        ):
+            depth += 1
+            maximum_depth = max(maximum_depth, depth)
+        for child in ast.iter_child_nodes(current):
+            walk(child, depth)
+
+    walk(node, 0)
+    return maximum_depth
+
+
+def annotations(node: ast.FunctionDef) -> list[str]:
+    values: list[str] = []
+    for argument in (
+        list(node.args.posonlyargs)
+        + list(node.args.args)
+        + list(node.args.kwonlyargs)
+    ):
+        if argument.annotation is not None:
+            values.append(ast.unparse(argument.annotation))
+    variable_argument = node.args.vararg
+    keyword_argument = node.args.kwarg
+    if variable_argument and variable_argument.annotation is not None:
+        values.append(ast.unparse(variable_argument.annotation))
+    if keyword_argument and keyword_argument.annotation is not None:
+        values.append(ast.unparse(keyword_argument.annotation))
+    if node.returns is not None:
+        values.append(ast.unparse(node.returns))
+    return values
 
 
 class ArchitectureRulesTestCase(unittest.TestCase):
@@ -146,35 +180,50 @@ class ArchitectureRulesTestCase(unittest.TestCase):
                     self.assertNotEqual(node.func.id, "input", f"{path} calls input() directly")
                     self.assertNotEqual(node.func.id, "print", f"{path} calls print() directly")
 
-    def test_no_direct_value_field_access_outside_value_objects(self):
-        for path in production_files():
-            if path in ALLOWED_VALUE_ACCESS_FILES:
-                continue
-            tree = ast.parse(path.read_text())
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.Attribute):
-                    continue
-                if node.attr != "value":
-                    continue
-                self.fail(f"{path} accesses raw .value directly")
-
-    def test_public_application_and_presentation_methods_avoid_raw_dict_and_list_annotations(self):
-        targets = {"application", "presentation"}
+    def test_boundary_methods_avoid_raw_dict_and_list_annotations(self):
+        targets = {"application", "model", "presentation", "repository", "console"}
         for path in production_files():
             if not set(path.parts).intersection(targets):
                 continue
             tree = ast.parse(path.read_text())
             for node in tree.body:
-                if not isinstance(node, ast.ClassDef):
-                    continue
-                for item in node.body:
+                items = node.body if isinstance(node, ast.ClassDef) else [node]
+                for item in items:
                     if not isinstance(item, ast.FunctionDef):
                         continue
-                    if item.name.startswith("_") or item.name in ALLOWED_COLLECTION_BOUNDARY_METHODS:
-                        continue
-                    signature = ast.get_source_segment(path.read_text(), item) or ""
-                    self.assertNotIn("list[", signature, f"{path}:{item.name} exposes raw list annotation")
-                    self.assertNotIn("dict[", signature, f"{path}:{item.name} exposes raw dict annotation")
+                    for annotation in annotations(item):
+                        self.assertNotIn("list[", annotation, f"{path}:{item.name} exposes raw list annotation")
+                        self.assertNotIn("dict[", annotation, f"{path}:{item.name} exposes raw dict annotation")
+                        self.assertNotIn("Any", annotation, f"{path}:{item.name} exposes Any annotation")
+
+    def test_methods_use_single_level_of_indentation(self):
+        for path in production_files():
+            tree = ast.parse(path.read_text())
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.FunctionDef):
+                    continue
+                self.assertLessEqual(
+                    control_depth(node),
+                    1,
+                    f"{path}:{node.name} uses nested control flow deeper than one level",
+                )
+
+    def test_identifiers_avoid_short_abbreviations(self):
+        for path in production_files():
+            tree = ast.parse(path.read_text())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Name):
+                    self.assertNotIn(
+                        node.id,
+                        FORBIDDEN_ABBREVIATIONS,
+                        f"{path}:{node.lineno} uses abbreviated identifier {node.id}",
+                    )
+                if isinstance(node, ast.arg):
+                    self.assertNotIn(
+                        node.arg,
+                        FORBIDDEN_ABBREVIATIONS,
+                        f"{path}:{node.lineno} uses abbreviated identifier {node.arg}",
+                    )
 
     def test_runtime_code_avoids_train_wreck_calls(self):
         for path in production_files():

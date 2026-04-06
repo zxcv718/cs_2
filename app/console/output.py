@@ -101,11 +101,11 @@ class ConsoleOutput:
 
     def _listing_lines(self, quiz_catalog: QuizCatalog) -> None:
         quiz_presenter = self.quiz_presenter
-        for raw_index, quiz in enumerate(
+        for quiz_position, quiz in enumerate(
             quiz_catalog,
             start=constants.DISPLAY_INDEX_START,
         ):
-            display_index = DisplayIndex(raw_index)
+            display_index = DisplayIndex(quiz_position)
             listing_lines = quiz_presenter.listing_lines(
                 quiz,
                 display_index,

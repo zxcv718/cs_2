@@ -8,18 +8,8 @@ from app.service.quiz_metrics import ScoreValue
 
 @dataclass(frozen=True)
 class ScoreOutcome:
-    _score: ScoreValue
-    _best_score_update: BestScoreUpdate
-
-    def score_value(self) -> ScoreValue:
-        return self._score
-
-    def best_score_update(self) -> BestScoreUpdate:
-        return self._best_score_update
-
-    def record_update_status(self):
-        best_score_update = self._best_score_update
-        return best_score_update.record_status()
+    score_value: ScoreValue
+    best_score_update: BestScoreUpdate
 
 
 class QuizScoreKeeper:
@@ -37,9 +27,10 @@ class QuizScoreKeeper:
         result: QuizPerformance,
     ) -> ScoreOutcome:
         scoring_service = self.scoring_service
+        answer_tally = result.answer_tally
         score = scoring_service.calculate_score(
-            result.correct_answers(),
-            result.hint_usages(),
+            answer_tally.correct_answers,
+            answer_tally.hint_usages,
         )
         best_score_service = self.best_score_service
         best_score_update = best_score_service.update_best_score(

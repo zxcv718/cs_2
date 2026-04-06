@@ -19,25 +19,22 @@ class ConsoleInput:
         min_value: int,
         max_value: int,
     ) -> int:
-        while True:
-            raw = input(prompt)
-            validated_number = self._validated_number(raw, min_value, max_value)
-            if validated_number is not None:
-                return validated_number
+        validated_number = self._requested_valid_number(prompt, min_value, max_value)
+        while validated_number is None:
+            validated_number = self._requested_valid_number(prompt, min_value, max_value)
+        return validated_number
 
     def request_non_empty_text(self, prompt: str) -> str:
-        while True:
-            raw_text = input(prompt)
-            non_empty_text = self._non_empty_text(raw_text)
-            if non_empty_text is not None:
-                return non_empty_text
+        non_empty_text = self._requested_non_empty_text(prompt)
+        while non_empty_text is None:
+            non_empty_text = self._requested_non_empty_text(prompt)
+        return non_empty_text
 
     def request_yes_no(self, prompt: str) -> bool:
-        while True:
-            raw_text = input(prompt)
-            yes_or_no = self._yes_or_no(raw_text)
-            if yes_or_no is not None:
-                return yes_or_no
+        yes_or_no = self._requested_yes_or_no(prompt)
+        while yes_or_no is None:
+            yes_or_no = self._requested_yes_or_no(prompt)
+        return yes_or_no
 
     def request_answer_or_hint(
         self,
@@ -45,11 +42,36 @@ class ConsoleInput:
         min_value: int = constants.MIN_ANSWER,
         max_value: int = constants.MAX_ANSWER,
     ) -> Union[int, str]:
-        while True:
-            raw_text = input(prompt)
-            answer_or_hint = self._answer_or_hint(raw_text, min_value, max_value)
-            if answer_or_hint is not None:
-                return answer_or_hint
+        answer_or_hint = self._requested_answer_or_hint(prompt, min_value, max_value)
+        while answer_or_hint is None:
+            answer_or_hint = self._requested_answer_or_hint(prompt, min_value, max_value)
+        return answer_or_hint
+
+    def _requested_valid_number(
+        self,
+        prompt: str,
+        min_value: int,
+        max_value: int,
+    ) -> int | None:
+        entered_text = input(prompt)
+        return self._validated_number(entered_text, min_value, max_value)
+
+    def _requested_non_empty_text(self, prompt: str) -> str | None:
+        entered_text = input(prompt)
+        return self._non_empty_text(entered_text)
+
+    def _requested_yes_or_no(self, prompt: str) -> bool | None:
+        entered_text = input(prompt)
+        return self._yes_or_no(entered_text)
+
+    def _requested_answer_or_hint(
+        self,
+        prompt: str,
+        min_value: int,
+        max_value: int,
+    ) -> Union[int, str, None]:
+        entered_text = input(prompt)
+        return self._answer_or_hint(entered_text, min_value, max_value)
 
     def _range_error(self, min_value: int, max_value: int) -> str:
         template = constants.ERROR_RANGE_TEMPLATE
@@ -98,17 +120,17 @@ class ConsoleInput:
             return None
         return value
 
-    def _non_empty_text(self, raw_text: str) -> str | None:
+    def _non_empty_text(self, entered_text: str) -> str | None:
         error_notifier = self.error_notifier
-        value = raw_text.strip()
+        value = entered_text.strip()
         if not value:
             error_notifier(constants.ERROR_EMPTY_INPUT)
             return None
         return value
 
-    def _yes_or_no(self, raw_text: str) -> bool | None:
+    def _yes_or_no(self, entered_text: str) -> bool | None:
         error_notifier = self.error_notifier
-        normalized = raw_text.strip()
+        normalized = entered_text.strip()
         value = normalized.lower()
         if value in constants.YES_TOKENS:
             return True
@@ -119,12 +141,12 @@ class ConsoleInput:
 
     def _answer_or_hint(
         self,
-        raw_text: str,
+        entered_text: str,
         min_value: int,
         max_value: int,
     ) -> Union[int, str, None]:
         error_notifier = self.error_notifier
-        normalized = raw_text.strip()
+        normalized = entered_text.strip()
         value = normalized.lower()
         if not value:
             error_notifier(constants.ERROR_EMPTY_INPUT)

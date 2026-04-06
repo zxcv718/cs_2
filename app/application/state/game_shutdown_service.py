@@ -31,7 +31,7 @@ class GameShutdownService:
             runtime_state,
             result,
         )
-        if record_update_status.is_updated():
+        if record_update_status.updated:
             console_interface.show_message(constants.MESSAGE_BEST_SCORE_UPDATED)
 
         console_interface.show_message(constants.MESSAGE_INTERRUPTED_EXIT)

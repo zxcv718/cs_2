@@ -3,7 +3,7 @@ import os
 from json import JSONDecodeError
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 import app.config.constants as constants
 from app.application.state.game_snapshot import GameSnapshot
@@ -27,8 +27,8 @@ class StateRepository:
             data = self._loaded_json()
         except FileNotFoundError:
             raise
-        except JSONDecodeError as exc:
-            raise ValueError(constants.ERROR_INVALID_JSON_STATE) from exc
+        except JSONDecodeError as decode_error:
+            raise ValueError(constants.ERROR_INVALID_JSON_STATE) from decode_error
         except OSError:
             raise
         return self._validated_state(data)
@@ -39,33 +39,12 @@ class StateRepository:
         game_snapshot: GameSnapshot,
     ) -> None:
         payload_mapper = self.payload_mapper
-        payload = payload_mapper.to_payload(game_snapshot)
-
-        # 폴더가 없으면 먼저 만들고 파일을 저장합니다.
-        # dump는 파이썬 객체를 json형식으로 파일에 바로 저장하는 함수
-        state_file = self.state_file
-        state_directory = state_file.parent
-        state_directory.mkdir(parents=True, exist_ok=True)
+        state_payload = payload_mapper.to_state_payload(game_snapshot)
+        payload = payload_mapper._payload_dictionary(state_payload)
         temp_file: Path | None = None
         try:
-            with NamedTemporaryFile(
-                mode=constants.FILE_WRITE_MODE,
-                encoding=constants.STATE_ENCODING,
-                dir=state_directory,
-                prefix=f".{state_file.name}.",
-                suffix=".tmp",
-                delete=False,
-            ) as file:
-                temp_file = Path(file.name)
-                json.dump(
-                    payload,
-                    file,
-                    ensure_ascii=constants.STATE_JSON_ENSURE_ASCII,
-                    indent=constants.STATE_JSON_INDENT,
-                )
-                file.flush()
-                os.fsync(file.fileno())
-            temp_file.replace(state_file)
+            temp_file = self._written_temporary_file(payload)
+            self._replace_state_file(temp_file)
         except Exception:
             self._cleanup_temporary_file(temp_file)
             raise
@@ -78,7 +57,7 @@ class StateRepository:
         state_file.replace(backup_file)
         return backup_file
 
-    def _loaded_json(self) -> Any:
+    def _loaded_json(self) -> object:
         state_file = self.state_file
         with state_file.open(
             constants.FILE_READ_MODE,
@@ -86,12 +65,13 @@ class StateRepository:
         ) as file:
             return json.load(file)
 
-    def _validated_state(self, data: Any) -> GameSnapshot:
+    def _validated_state(self, payload_source: object) -> GameSnapshot:
         payload_mapper = self.payload_mapper
         try:
-            return payload_mapper.from_payload(data)
-        except ValueError as exc:
-            raise ValueError(constants.ERROR_INVALID_STATE_SCHEMA) from exc
+            state_payload = payload_mapper._state_payload(payload_source)
+            return payload_mapper.from_state_payload(state_payload)
+        except ValueError as validation_error:
+            raise ValueError(constants.ERROR_INVALID_STATE_SCHEMA) from validation_error
 
     def _available_backup_file_path(self) -> Path:
         state_file = self.state_file
@@ -113,3 +93,34 @@ class StateRepository:
             return
         except OSError:
             return
+
+    def _written_temporary_file(self, payload: object) -> Path:
+        state_directory = self._state_directory()
+        state_file = self.state_file
+        with NamedTemporaryFile(
+            mode=constants.FILE_WRITE_MODE,
+            encoding=constants.STATE_ENCODING,
+            dir=state_directory,
+            prefix=f".{state_file.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as file:
+            temp_file = Path(file.name)
+            json.dump(
+                payload,
+                file,
+                ensure_ascii=constants.STATE_JSON_ENSURE_ASCII,
+                indent=constants.STATE_JSON_INDENT,
+            )
+            file.flush()
+            os.fsync(file.fileno())
+        return temp_file
+
+    def _replace_state_file(self, temp_file: Path) -> None:
+        state_file = self.state_file
+        temp_file.replace(state_file)
+
+    def _state_directory(self) -> Path:
+        state_directory = self.state_file.parent
+        state_directory.mkdir(parents=True, exist_ok=True)
+        return state_directory

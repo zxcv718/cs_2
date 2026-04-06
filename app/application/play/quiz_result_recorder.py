@@ -22,17 +22,18 @@ class QuizResultRecorder:
         result: QuizPerformance,
     ) -> ScoreOutcome:
         score_keeper = self.score_keeper
+        record_book = runtime_state.record_book
         score_outcome = score_keeper.keep(
-            runtime_state.best_score(),
+            record_book.best_score,
             result,
         )
         history_service = self.history_service
         history_entry = history_service.create_entry(
             result,
-            score_outcome.score_value(),
+            score_outcome.score_value,
         )
         runtime_state.record_play_result(
-            score_outcome.best_score_update(),
+            score_outcome.best_score_update,
             history_entry,
         )
         return score_outcome

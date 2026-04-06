@@ -4,6 +4,15 @@ import app.config.constants as constants
 from app.console.interface import ConsoleInterface
 from app.model.quiz import Quiz
 from app.model.quiz_catalog import QuizCatalog
+from app.model.quiz_components import (
+    AnswerNumber,
+    ChoiceDrafts,
+    HintText,
+    QuestionText,
+    QuizDraft,
+    QuizDraftPrompt,
+    QuizDraftSolution,
+)
 from app.model.quiz_factory import QuizFactory
 
 
@@ -35,17 +44,25 @@ class QuizCatalogCreationService:
             hint_prompt = constants.PROMPT_ENTER_HINT
             hint = console_interface.request_non_empty_text(hint_prompt)
 
-        created_quiz = quiz_factory.create(question, choices, answer, hint=hint)
+        question_text = QuestionText.from_raw(question)
+        answer_number = AnswerNumber.from_raw(answer)
+        hint_text = HintText.from_raw(hint)
+        quiz_draft = QuizDraft(
+            prompt=QuizDraftPrompt(question_text, choices),
+            solution=QuizDraftSolution(answer_number, hint_text),
+        )
+        created_quiz = quiz_factory.create(quiz_draft)
         quiz_catalog.append(created_quiz)
         added_message = constants.MESSAGE_QUIZ_ADDED
         console_interface.show_message(added_message)
         return created_quiz
 
-    def _choices(self, console_interface: ConsoleInterface) -> list[str]:
-        return [
+    def _choices(self, console_interface: ConsoleInterface) -> ChoiceDrafts:
+        choice_texts = tuple(
             console_interface.request_non_empty_text(self._choice_prompt(index))
             for index in self._choice_indexes()
-        ]
+        )
+        return ChoiceDrafts.from_iterable(choice_texts)
 
     def _choice_indexes(self) -> range:
         start = constants.DISPLAY_INDEX_START

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Iterator, Optional
+from typing import Iterable, Iterator, Optional
 
 import app.config.constants as constants
 
@@ -12,14 +12,31 @@ class QuestionText:
     def from_raw(cls, question: str) -> "QuestionText":
         if not isinstance(question, str):
             raise ValueError(constants.ERROR_QUESTION_MUST_BE_STRING)
-
-        normalized = question.strip()
-        if not normalized:
+        normalized_question = question.strip()
+        if not normalized_question:
             raise ValueError(constants.ERROR_QUESTION_MUST_NOT_BE_EMPTY)
-        return cls(normalized)
+        return cls(normalized_question)
 
     def __str__(self) -> str:
         return self.value
+
+
+@dataclass(frozen=True)
+class ChoiceDrafts:
+    values: tuple[str, ...]
+
+    @classmethod
+    def from_iterable(cls, choices: Iterable[str]) -> "ChoiceDrafts":
+        choice_values = tuple(cls._choice_texts(choices))
+        return cls(choice_values)
+
+    @staticmethod
+    def _choice_texts(choices: Iterable[str]) -> Iterator[str]:
+        for choice in choices:
+            yield ChoiceSet._normalized_choice(choice)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.values)
 
 
 @dataclass(frozen=True)
@@ -27,35 +44,30 @@ class ChoiceSet:
     values: tuple[str, ...]
 
     @classmethod
-    def from_raw(cls, choices: list[str]) -> "ChoiceSet":
+    def from_drafts(cls, choice_drafts: ChoiceDrafts) -> "ChoiceSet":
+        choices = tuple(choice_drafts)
         validated_choices = cls._validated_choices(choices)
-        normalized_choices = tuple(
-            cls._normalized_choice(choice) for choice in validated_choices
-        )
-        return cls(normalized_choices)
+        return cls(validated_choices)
 
     @staticmethod
-    def _validated_choices(choices: list[str]) -> list[str]:
+    def _validated_choices(choices: tuple[str, ...]) -> tuple[str, ...]:
         choice_count = constants.CHOICE_COUNT
-        if isinstance(choices, list) and len(choices) == choice_count:
-            return choices
-        error_template = constants.ERROR_CHOICES_LENGTH_TEMPLATE
-        raise ValueError(error_template.format(choice_count=choice_count))
+        if len(choices) != choice_count:
+            error_template = constants.ERROR_CHOICES_LENGTH_TEMPLATE
+            raise ValueError(error_template.format(choice_count=choice_count))
+        return choices
 
     @staticmethod
     def _normalized_choice(choice: str) -> str:
         if not isinstance(choice, str):
             raise ValueError(constants.ERROR_CHOICE_MUST_BE_STRING)
-        normalized = choice.strip()
-        if not normalized:
+        normalized_choice = choice.strip()
+        if not normalized_choice:
             raise ValueError(constants.ERROR_CHOICE_MUST_NOT_BE_EMPTY)
-        return normalized
+        return normalized_choice
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.values)
-
-    def choice_texts(self) -> tuple[str, ...]:
-        return tuple(self.values)
 
     def choice_text(self, answer_number: "AnswerNumber") -> str:
         choice_index = int(answer_number) - constants.DISPLAY_INDEX_START
@@ -107,11 +119,10 @@ class HintText:
             return None
         if not isinstance(hint, str):
             raise ValueError(constants.ERROR_HINT_MUST_BE_STRING_OR_NONE)
-
-        normalized = hint.strip()
-        if not normalized:
+        normalized_hint = hint.strip()
+        if not normalized_hint:
             return None
-        return cls(normalized)
+        return cls(normalized_hint)
 
     def __str__(self) -> str:
         return self.value
@@ -134,3 +145,21 @@ class QuizSolution:
 
     def can_offer_hint(self) -> bool:
         return self.hint_text is not None
+
+
+@dataclass(frozen=True)
+class QuizDraftPrompt:
+    question_text: QuestionText
+    choice_drafts: ChoiceDrafts
+
+
+@dataclass(frozen=True)
+class QuizDraftSolution:
+    answer_number: AnswerNumber
+    hint_text: Optional[HintText] = None
+
+
+@dataclass(frozen=True)
+class QuizDraft:
+    prompt: QuizDraftPrompt
+    solution: QuizDraftSolution

@@ -5,8 +5,8 @@ from app.service.quiz_metrics import CorrectAnswerCount, HintUsageCount, Questio
 
 @dataclass(frozen=True)
 class AnswerTally:
-    _correct_count: CorrectAnswerCount
-    _hint_used_count: HintUsageCount
+    correct_answers: CorrectAnswerCount
+    hint_usages: HintUsageCount
 
     @classmethod
     def empty(cls) -> "AnswerTally":
@@ -14,32 +14,15 @@ class AnswerTally:
 
     def add(self, answer_tally: "AnswerTally") -> "AnswerTally":
         return AnswerTally(
-            self._correct_count.add(answer_tally.correct_answers()),
-            self._hint_used_count.add(answer_tally.hint_usages()),
+            self.correct_answers.add(answer_tally.correct_answers),
+            self.hint_usages.add(answer_tally.hint_usages),
         )
-
-    def correct_answers(self) -> CorrectAnswerCount:
-        return self._correct_count
-
-    def hint_usages(self) -> HintUsageCount:
-        return self._hint_used_count
 
 
 @dataclass(frozen=True)
 class QuizPerformance:
-    _total_questions: QuestionCount
-    _answer_tally: AnswerTally
-
-    def question_count(self) -> QuestionCount:
-        return self._total_questions
-
-    def correct_answers(self) -> CorrectAnswerCount:
-        answer_tally = self._answer_tally
-        return answer_tally.correct_answers()
-
-    def hint_usages(self) -> HintUsageCount:
-        answer_tally = self._answer_tally
-        return answer_tally.hint_usages()
+    total_questions: QuestionCount
+    answer_tally: AnswerTally
 
 
 class QuizSessionInterrupted(Exception):

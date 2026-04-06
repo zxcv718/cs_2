@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable
 
 import app.config.constants as constants
@@ -10,7 +11,7 @@ from app.application.state.game_state_service import GameStateService
 
 @dataclass(frozen=True)
 class PersistenceDecision:
-    _requires_save: bool
+    requires_save: bool
 
     @classmethod
     def save(cls) -> "PersistenceDecision":
@@ -20,20 +21,10 @@ class PersistenceDecision:
     def skip(cls) -> "PersistenceDecision":
         return cls(False)
 
-    def requires_save(self) -> bool:
-        return self._requires_save
-
-
 @dataclass(frozen=True)
 class RecoveryPlan:
-    _game_snapshot: GameSnapshot
-    _persistence_decision: PersistenceDecision
-
-    def game_snapshot(self) -> GameSnapshot:
-        return self._game_snapshot
-
-    def persistence_decision(self) -> PersistenceDecision:
-        return self._persistence_decision
+    game_snapshot: GameSnapshot
+    persistence_decision: PersistenceDecision
 
 
 class StateRecoveryPolicy:
@@ -65,13 +56,16 @@ class StateRecoveryPolicy:
         )
 
     def _backup_decision(self) -> PersistenceDecision:
-        state_service = self.state_service
         try:
-            if state_service.backup_state_file() is None:
-                return PersistenceDecision.skip()
-            return PersistenceDecision.save()
+            backup_file = self.state_service.backup_state_file()
         except OSError:
             return PersistenceDecision.skip()
+        return self._decision_for_backup_file(backup_file)
+
+    def _decision_for_backup_file(self, backup_file: Path | None) -> PersistenceDecision:
+        if backup_file is None:
+            return PersistenceDecision.skip()
+        return PersistenceDecision.save()
 
 
 class StateRecoveryPersistence:
@@ -79,10 +73,10 @@ class StateRecoveryPersistence:
         self.persistence_service = persistence_service
 
     def apply(self, recovery_plan: RecoveryPlan) -> GameSnapshot:
-        persistence_decision = recovery_plan.persistence_decision()
-        if persistence_decision.requires_save():
-            self.persistence_service.save_snapshot(recovery_plan.game_snapshot())
-        return recovery_plan.game_snapshot()
+        persistence_decision = recovery_plan.persistence_decision
+        if persistence_decision.requires_save:
+            self.persistence_service.save_snapshot(recovery_plan.game_snapshot)
+        return recovery_plan.game_snapshot
 
 
 class DefaultStateRecovery:

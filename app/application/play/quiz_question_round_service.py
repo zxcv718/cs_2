@@ -61,14 +61,27 @@ class QuizQuestionRoundService:
         console_interface = self.console_interface
         console_interface.show_question(quiz, index, total_questions)
         round_state = QuizQuestionRoundState()
+        return self._protected_round_result(quiz, round_state)
 
+    def _protected_round_result(
+        self,
+        quiz: Quiz,
+        round_state: QuizQuestionRoundState,
+    ) -> AnswerTally:
         try:
-            while True:
-                round_result = self._result_for_next_input(quiz, round_state)
-                if round_result is not None:
-                    return round_result
-        except (KeyboardInterrupt, EOFError) as exc:
-            raise QuizQuestionRoundInterrupted(round_state.hint_used_count) from exc
+            return self._round_result(quiz, round_state)
+        except (KeyboardInterrupt, EOFError) as interrupted_program:
+            raise QuizQuestionRoundInterrupted(round_state.hint_used_count) from interrupted_program
+
+    def _round_result(
+        self,
+        quiz: Quiz,
+        round_state: QuizQuestionRoundState,
+    ) -> AnswerTally:
+        round_result = self._result_for_next_input(quiz, round_state)
+        while round_result is None:
+            round_result = self._result_for_next_input(quiz, round_state)
+        return round_result
 
     def _result_for_next_input(
         self,

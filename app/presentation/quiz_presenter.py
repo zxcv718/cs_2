@@ -41,15 +41,20 @@ class QuizPresenter:
         return (question_header, *choice_lines)
 
     def hint_message(self, quiz: Quiz) -> str:
-        hint_text = quiz.hint_text()
+        solution = quiz.solution
+        hint_text = solution.hint_text
         if hint_text is None:
             return constants.EMPTY_TEXT
-        return hint_text
+        return str(hint_text)
 
     def wrong_answer_message(self, quiz: Quiz) -> str:
-        answer = quiz.answer_number()
+        solution = quiz.solution
+        answer_number = solution.answer_number
+        answer = int(answer_number)
         choice_index = answer - constants.DISPLAY_INDEX_START
-        choice_values = quiz.choice_texts()
+        prompt = quiz.prompt
+        choice_set = prompt.choice_set
+        choice_values = tuple(choice_set)
         correct_text = choice_values[choice_index]
         error_template = constants.ERROR_WRONG_ANSWER_TEMPLATE
         return error_template.format(
@@ -58,14 +63,18 @@ class QuizPresenter:
         )
 
     def _question_line(self, quiz: Quiz) -> str:
-        return quiz.question_text()
+        prompt = quiz.prompt
+        question_text = prompt.question_text
+        return str(question_text)
 
     def _choice_lines(
         self,
         quiz: Quiz,
         choice_template: str,
     ) -> tuple[str, ...]:
-        choice_values = quiz.choice_texts()
+        prompt = quiz.prompt
+        choice_set = prompt.choice_set
+        choice_values = tuple(choice_set)
         start = constants.DISPLAY_INDEX_START
         return tuple(
             choice_template.format(

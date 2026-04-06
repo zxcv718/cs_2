@@ -1,12 +1,36 @@
 import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
 from unittest.mock import patch
 
+from app.model.quiz_components import (
+    AnswerNumber,
+    ChoiceDrafts,
+    HintText,
+    QuestionText,
+    QuizDraft,
+    QuizDraftPrompt,
+    QuizDraftSolution,
+)
+from app.model.quiz_factory import QuizFactory
 from app.repository.quiz_payload_mapper import QuizPayloadMapper
 from app.repository.state_payload_mapper import StatePayloadMapper
 from app.repository.state_repository import StateRepository
-from app.model.quiz_factory import QuizFactory
+
+
+def create_quiz(question: str, choices: list[str], answer: int, hint: str | None = None):
+    quiz_draft = QuizDraft(
+        prompt=QuizDraftPrompt(
+            QuestionText.from_raw(question),
+            ChoiceDrafts.from_iterable(choices),
+        ),
+        solution=QuizDraftSolution(
+            AnswerNumber.from_raw(answer),
+            HintText.from_raw(hint),
+        ),
+    )
+    return QuizFactory().create(quiz_draft)
 
 
 class StateRepositoryTestCase(unittest.TestCase):
@@ -16,7 +40,6 @@ class StateRepositoryTestCase(unittest.TestCase):
         self.repository = StateRepository(self.state_file)
         self.quiz_mapper = QuizPayloadMapper()
         self.state_mapper = StatePayloadMapper()
-        self.quiz_factory = QuizFactory()
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -28,11 +51,15 @@ class StateRepositoryTestCase(unittest.TestCase):
             "answer": 1,
         }
 
-        quiz = self.quiz_mapper.from_payload(item)
-        payload_item = self.quiz_mapper.to_payload(quiz)
+        payload_item = self.quiz_mapper._payload_item(item)
+        quiz = self.quiz_mapper.from_payload_item(payload_item)
+        restored_payload = self.quiz_mapper._payload_dictionary(
+            self.quiz_mapper.to_payload_item(quiz)
+        )
+        restored_payload = cast(dict, restored_payload)
 
-        self.assertEqual(payload_item["question"], "문제")
-        self.assertEqual(payload_item["answer"], 1)
+        self.assertEqual(restored_payload["question"], "문제")
+        self.assertEqual(restored_payload["answer"], 1)
 
     def test_quiz_payload_mapper_rejects_invalid_answer(self):
         item = {
@@ -42,7 +69,7 @@ class StateRepositoryTestCase(unittest.TestCase):
         }
 
         with self.assertRaises(ValueError):
-            self.quiz_mapper.from_payload(item)
+            self.quiz_mapper._payload_item(item)
 
     def test_state_payload_mapper_accepts_required_schema(self):
         data = {
@@ -56,33 +83,42 @@ class StateRepositoryTestCase(unittest.TestCase):
             "best_score": None,
         }
 
-        state = self.state_mapper.from_payload(data)
-        payload = self.state_mapper.to_payload(state)
+        state_payload = self.state_mapper._state_payload(data)
+        state = self.state_mapper.from_state_payload(state_payload)
+        payload = self.state_mapper._payload_dictionary(
+            self.state_mapper.to_state_payload(state)
+        )
+        payload = cast(dict, payload)
 
-        self.assertEqual(len(state.quiz_catalog()), 1)
+        self.assertEqual(len(state.quiz_catalog), 1)
         self.assertIsNone(payload["best_score"])
 
     def test_state_payload_mapper_rejects_missing_quizzes(self):
         data = {"best_score": None}
 
         with self.assertRaises(ValueError):
-            self.state_mapper.from_payload(data)
+            self.state_mapper._state_payload(data)
 
     def test_quiz_payload_mapper_round_trip_is_consistent(self):
-        quiz = self.quiz_factory.create("문제", ["A", "B", "C", "D"], 2, hint="힌트")
+        quiz = create_quiz("문제", ["A", "B", "C", "D"], 2, hint="힌트")
 
-        item = self.quiz_mapper.to_payload(quiz)
-        restored = self.quiz_mapper.from_payload(item)
-        restored_payload = self.quiz_mapper.to_payload(restored)
-        original_payload = self.quiz_mapper.to_payload(quiz)
+        payload_item = self.quiz_mapper.to_payload_item(quiz)
+        restored = self.quiz_mapper.from_payload_item(payload_item)
+        restored_payload = self.quiz_mapper._payload_dictionary(
+            self.quiz_mapper.to_payload_item(restored)
+        )
+        original_payload = self.quiz_mapper._payload_dictionary(payload_item)
+        restored_payload = cast(dict, restored_payload)
+        original_payload = cast(dict, original_payload)
 
         self.assertEqual(restored_payload, original_payload)
 
     def test_save_and_load_state_round_trip(self):
-        quizzes = [self.quiz_factory.create("문제", ["A", "B", "C", "D"], 1, hint="힌트")]
-        snapshot = self.state_mapper.from_payload(
+        quiz = create_quiz("문제", ["A", "B", "C", "D"], 1, hint="힌트")
+        quiz_payload_item = self.quiz_mapper.to_payload_item(quiz)
+        state_payload = self.state_mapper._state_payload(
             {
-                "quizzes": [self.quiz_mapper.to_payload(quiz) for quiz in quizzes],
+                "quizzes": [self.quiz_mapper._payload_dictionary(quiz_payload_item)],
                 "best_score": 40,
                 "history": [
                     {
@@ -95,15 +131,19 @@ class StateRepositoryTestCase(unittest.TestCase):
                 ],
             }
         )
+        snapshot = self.state_mapper.from_state_payload(state_payload)
 
         self.repository.save_state(snapshot)
 
         state = self.repository.load_state()
-        payload = self.state_mapper.to_payload(state)
+        restored_payload = self.state_mapper._payload_dictionary(
+            self.state_mapper.to_state_payload(state)
+        )
+        restored_payload = cast(dict, restored_payload)
 
-        self.assertEqual(len(state.quiz_catalog()), 1)
-        self.assertEqual(payload["best_score"], 40)
-        self.assertEqual(payload["history"][0]["score"], 38)
+        self.assertEqual(len(state.quiz_catalog), 1)
+        self.assertEqual(restored_payload["best_score"], 40)
+        self.assertEqual(restored_payload["history"][0]["score"], 38)
 
     def test_load_state_raises_file_not_found(self):
         missing_repository = StateRepository(Path(self.temp_dir.name) / "missing.json")
@@ -120,13 +160,16 @@ class StateRepositoryTestCase(unittest.TestCase):
     def test_save_state_preserves_original_file_when_replace_fails(self):
         original_text = '{"status": "original"}'
         self.state_file.write_text(original_text, encoding="utf-8")
-        quizzes = [self.quiz_factory.create("문제", ["A", "B", "C", "D"], 1)]
-        snapshot = self.state_mapper.from_payload(
-            {
-                "quizzes": [self.quiz_mapper.to_payload(quiz) for quiz in quizzes],
-                "best_score": 10,
-                "history": [],
-            }
+        quiz = create_quiz("문제", ["A", "B", "C", "D"], 1)
+        quiz_payload_item = self.quiz_mapper.to_payload_item(quiz)
+        snapshot = self.state_mapper.from_state_payload(
+            self.state_mapper._state_payload(
+                {
+                    "quizzes": [self.quiz_mapper._payload_dictionary(quiz_payload_item)],
+                    "best_score": 10,
+                    "history": [],
+                }
+            )
         )
 
         with patch("pathlib.Path.replace", side_effect=OSError("replace failed")):
@@ -179,7 +222,7 @@ class StateRepositoryTestCase(unittest.TestCase):
         }
 
         with self.assertRaises(ValueError):
-            self.state_mapper.from_payload(data)
+            self.state_mapper._state_payload(data)
 
     def test_state_payload_mapper_rejects_hint_count_over_total(self):
         data = {
@@ -203,7 +246,7 @@ class StateRepositoryTestCase(unittest.TestCase):
         }
 
         with self.assertRaises(ValueError):
-            self.state_mapper.from_payload(data)
+            self.state_mapper._state_payload(data)
 
 
 if __name__ == "__main__":

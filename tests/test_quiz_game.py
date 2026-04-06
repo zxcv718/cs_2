@@ -25,9 +25,18 @@ from app.application.state.game_state_service import GameStateService
 from app.console.input import ConsoleInput
 from app.console.interface import ConsoleInterface
 from app.model.quiz import Quiz
-from app.model.quiz_catalog import QuizCatalog
+from app.model.quiz_catalog import QuizCatalog, QuizItems
+from app.model.quiz_components import (
+    AnswerNumber,
+    ChoiceDrafts,
+    HintText,
+    QuestionText,
+    QuizDraft,
+    QuizDraftPrompt,
+    QuizDraftSolution,
+)
 from app.model.quiz_factory import QuizFactory
-from app.model.quiz_selection import QuizSelection
+from app.model.quiz_selection import QuizSelection, QuizSelectionItems
 from app.repository.quiz_payload_mapper import QuizPayloadMapper
 from app.repository.state_payload_mapper import StatePayloadMapper
 from app.repository.state_repository import StateRepository
@@ -42,17 +51,42 @@ from app.service.quiz_metrics import (
 )
 
 
-def snapshot_payload(snapshot) -> dict:
-    return StatePayloadMapper().to_payload(snapshot)
+def create_quiz(
+    question: str,
+    choices: list[str],
+    answer: int,
+    hint: str | None = None,
+) -> Quiz:
+    quiz_draft = QuizDraft(
+        prompt=QuizDraftPrompt(
+            QuestionText.from_raw(question),
+            ChoiceDrafts.from_iterable(choices),
+        ),
+        solution=QuizDraftSolution(
+            AnswerNumber.from_raw(answer),
+            HintText.from_raw(hint),
+        ),
+    )
+    return QuizFactory().create(quiz_draft)
 
 
-def snapshot_from_payload(payload: dict):
-    quiz_mapper = QuizPayloadMapper()
-    quizzes = payload["quizzes"]
-    if quizzes and isinstance(quizzes[0], Quiz):
-        payload = dict(payload)
-        payload["quizzes"] = [quiz_mapper.to_payload(quiz) for quiz in quizzes]
-    return StatePayloadMapper().from_payload(payload)
+def payload_dictionary(snapshot) -> dict:
+    state_mapper = StatePayloadMapper()
+    state_payload = state_mapper.to_state_payload(snapshot)
+    return cast(dict, state_mapper._payload_dictionary(state_payload))
+
+
+def snapshot_from_dictionary(payload: dict):
+    state_mapper = StatePayloadMapper()
+    state_payload = state_mapper._state_payload(payload)
+    return state_mapper.from_state_payload(state_payload)
+
+
+def optional_score(best_score: BestScore) -> int | None:
+    score_value = best_score.score_value
+    if score_value is None:
+        return None
+    return int(score_value)
 
 
 class DummyConsoleInterface(ConsoleInterface):
@@ -187,27 +221,24 @@ class AlwaysIncorrectRoundService:
 
 class DummyStateRepository(StateRepository):
     def __init__(self):
-        factory = QuizFactory()
         quiz_mapper = QuizPayloadMapper()
-        self.saved_snapshot = None
-        self.saved_payload = None
-        self.loaded_payload = {
-            "quizzes": [
-                quiz_mapper.to_payload(
-                    factory.create("기본 문제", ["A", "B", "C", "D"], 1)
-                )
-            ],
-            "best_score": 10,
-            "history": [],
-        }
-        self.loaded_snapshot = snapshot_from_payload(self.loaded_payload)
+        self.saved = None
+        payload_item = quiz_mapper.to_payload_item(
+            create_quiz("기본 문제", ["A", "B", "C", "D"], 1)
+        )
+        self.loaded_state = snapshot_from_dictionary(
+            {
+                "quizzes": [quiz_mapper._payload_dictionary(payload_item)],
+                "best_score": 10,
+                "history": [],
+            }
+        )
 
     def load_state(self):
-        return self.loaded_snapshot
+        return self.loaded_state
 
     def save_state(self, game_snapshot):
-        self.saved_snapshot = game_snapshot
-        self.saved_payload = snapshot_payload(game_snapshot)
+        self.saved = payload_dictionary(game_snapshot)
 
     def backup_state_file(self):
         return None
@@ -230,7 +261,10 @@ class FailingSaveStateRepository(DummyStateRepository):
 
 class DeterministicQuizSessionService(QuizSessionService):
     def _select_quizzes(self, quiz_catalog, question_count):
-        return QuizSelection.from_items(list(quiz_catalog)[: int(question_count)])
+        selection_items = QuizSelectionItems.from_iterable(
+            list(quiz_catalog)[: int(question_count)]
+        )
+        return QuizSelection(selection_items)
 
 
 class DefaultGameStateFactoryTestCase(unittest.TestCase):
@@ -238,12 +272,12 @@ class DefaultGameStateFactoryTestCase(unittest.TestCase):
         factory = DefaultGameStateFactory()
 
         state = factory.create_state()
-        quiz_catalog = state.quiz_catalog()
-        record_book = state.game_record_book()
+        quiz_catalog = state.quiz_catalog
+        record_book = state.game_record_book
 
         self.assertGreaterEqual(len(quiz_catalog), 5)
-        self.assertIsNone(record_book.current_best_score().to_optional_int())
-        self.assertEqual(len(record_book.play_history()), 0)
+        self.assertIsNone(optional_score(record_book.best_score))
+        self.assertEqual(len(record_book.play_history), 0)
         self.assertTrue(all(isinstance(q, Quiz) for q in quiz_catalog))
 
 
@@ -255,8 +289,7 @@ class GameStateServiceTestCase(unittest.TestCase):
         loaded_state = service.load_state()
         service.save_state(loaded_state)
 
-        self.assertEqual(snapshot_payload(loaded_state), repository.loaded_payload)
-        self.assertIsNotNone(repository.saved_snapshot)
+        self.assertIsNotNone(repository.saved)
 
 
 class BestScoreServiceTestCase(unittest.TestCase):
@@ -264,9 +297,10 @@ class BestScoreServiceTestCase(unittest.TestCase):
         service = BestScoreService()
 
         best_score_update = service.update_best_score(BestScore.empty(), ScoreValue(30))
+        best_score = best_score_update.best_score
 
-        self.assertEqual(best_score_update.best_score().to_optional_int(), 30)
-        self.assertTrue(best_score_update.is_updated())
+        self.assertEqual(optional_score(best_score), 30)
+        self.assertTrue(best_score_update.record_update_status.updated)
 
     def test_update_best_score_replaces_lower_score(self):
         service = BestScoreService()
@@ -275,9 +309,10 @@ class BestScoreServiceTestCase(unittest.TestCase):
             BestScore.from_optional_int(20),
             ScoreValue(30),
         )
+        best_score = best_score_update.best_score
 
-        self.assertEqual(best_score_update.best_score().to_optional_int(), 30)
-        self.assertTrue(best_score_update.is_updated())
+        self.assertEqual(optional_score(best_score), 30)
+        self.assertTrue(best_score_update.record_update_status.updated)
 
     def test_update_best_score_keeps_higher_score(self):
         service = BestScoreService()
@@ -286,9 +321,10 @@ class BestScoreServiceTestCase(unittest.TestCase):
             BestScore.from_optional_int(40),
             ScoreValue(30),
         )
+        best_score = best_score_update.best_score
 
-        self.assertEqual(best_score_update.best_score().to_optional_int(), 40)
-        self.assertFalse(best_score_update.is_updated())
+        self.assertEqual(optional_score(best_score), 40)
+        self.assertFalse(best_score_update.record_update_status.updated)
 
 
 class QuizScoringServiceTestCase(unittest.TestCase):
@@ -336,11 +372,14 @@ class QuizHistoryServiceTestCase(unittest.TestCase):
 
         entry = service.create_entry(result, score_value=ScoreValue(38))
 
-        self.assertEqual(int(entry.question_count()), 5)
-        self.assertEqual(int(entry.correct_answers()), 4)
-        self.assertEqual(int(entry.score_value()), 38)
-        self.assertEqual(int(entry.hint_usages()), 1)
-        self.assertTrue(str(entry.played_at()))
+        scored_performance = entry.scored_performance
+        quiz_performance = scored_performance.quiz_performance
+        answer_tally = quiz_performance.answer_tally
+        self.assertEqual(int(quiz_performance.total_questions), 5)
+        self.assertEqual(int(answer_tally.correct_answers), 4)
+        self.assertEqual(int(scored_performance.score_value), 38)
+        self.assertEqual(int(answer_tally.hint_usages), 1)
+        self.assertTrue(str(entry.played_at))
 
 
 class QuestionCountChooserTestCase(unittest.TestCase):
@@ -357,7 +396,7 @@ class QuizQuestionRoundServiceTestCase(unittest.TestCase):
     def test_play_round_counts_hint_and_correct_answer(self):
         console_interface = HintThenCorrectConsoleInterface()
         service = QuizQuestionRoundService(console_interface)
-        quiz = QuizFactory().create("문제", ["A", "B", "C", "D"], 2, hint="힌트")
+        quiz = create_quiz("문제", ["A", "B", "C", "D"], 2, hint="힌트")
 
         result = service.play_round(
             quiz,
@@ -365,8 +404,8 @@ class QuizQuestionRoundServiceTestCase(unittest.TestCase):
             total_questions=QuestionCount(3),
         )
 
-        self.assertEqual(int(result.correct_answers()), 1)
-        self.assertEqual(int(result.hint_usages()), 1)
+        self.assertEqual(int(result.correct_answers), 1)
+        self.assertEqual(int(result.hint_usages), 1)
         self.assertTrue(console_interface.messages)
 
     def test_play_round_handles_many_retry_inputs_without_recursion_error(self):
@@ -375,7 +414,7 @@ class QuizQuestionRoundServiceTestCase(unittest.TestCase):
             final_answer=1,
         )
         service = QuizQuestionRoundService(console_interface)
-        quiz = QuizFactory().create("문제", ["A", "B", "C", "D"], 1)
+        quiz = create_quiz("문제", ["A", "B", "C", "D"], 1)
 
         result = service.play_round(
             quiz,
@@ -383,17 +422,21 @@ class QuizQuestionRoundServiceTestCase(unittest.TestCase):
             total_questions=QuestionCount(1),
         )
 
-        self.assertEqual(int(result.correct_answers()), 1)
+        self.assertEqual(int(result.correct_answers), 1)
         self.assertEqual(len(console_interface.errors), 1200)
 
 
 class QuizPartialResultBuilderTestCase(unittest.TestCase):
     def test_build_interrupted_result_returns_none_before_any_answer(self):
         builder = QuizPartialResultBuilder()
+        answer_tally = AnswerTally(
+            CorrectAnswerCount(0),
+            HintUsageCount(0),
+        )
 
         result = builder.build_interrupted_result(
             total_questions=QuestionCount(3),
-            answer_tally=AnswerTally.empty(),
+            answer_tally=answer_tally,
             answered_question_count=QuestionCount(0),
         )
 
@@ -404,12 +447,11 @@ class QuizSessionServiceTestCase(unittest.TestCase):
     def test_play_raises_interrupted_with_partial_result_after_answer(self):
         console_interface = InterruptingSessionConsoleInterface()
         service = DeterministicQuizSessionService(console_interface)
-        factory = QuizFactory()
         quizzes = [
-            factory.create("문제1", ["A", "B", "C", "D"], 1),
-            factory.create("문제2", ["A", "B", "C", "D"], 2),
+            create_quiz("문제1", ["A", "B", "C", "D"], 1),
+            create_quiz("문제2", ["A", "B", "C", "D"], 2),
         ]
-        quiz_catalog = QuizCatalog.from_items(quizzes)
+        quiz_catalog = QuizCatalog(QuizItems.from_iterable(quizzes))
 
         with self.assertRaises(QuizSessionInterrupted) as context:
             service.play(quiz_catalog)
@@ -418,19 +460,19 @@ class QuizSessionServiceTestCase(unittest.TestCase):
 
         self.assertIsNotNone(partial_performance)
         assert partial_performance is not None
-        self.assertEqual(int(partial_performance.question_count()), 2)
-        self.assertEqual(int(partial_performance.correct_answers()), 1)
-        self.assertEqual(int(partial_performance.hint_usages()), 0)
+        answer_tally = partial_performance.answer_tally
+        self.assertEqual(int(partial_performance.total_questions), 2)
+        self.assertEqual(int(answer_tally.correct_answers), 1)
+        self.assertEqual(int(answer_tally.hint_usages), 0)
 
     def test_play_keeps_hint_count_when_interrupted_after_showing_hint(self):
         console_interface = AnswerThenHintThenInterruptConsoleInterface()
         service = DeterministicQuizSessionService(console_interface)
-        factory = QuizFactory()
         quizzes = [
-            factory.create("문제1", ["A", "B", "C", "D"], 1, hint="힌트1"),
-            factory.create("문제2", ["A", "B", "C", "D"], 2, hint="힌트2"),
+            create_quiz("문제1", ["A", "B", "C", "D"], 1, hint="힌트1"),
+            create_quiz("문제2", ["A", "B", "C", "D"], 2, hint="힌트2"),
         ]
-        quiz_catalog = QuizCatalog.from_items(quizzes)
+        quiz_catalog = QuizCatalog(QuizItems.from_iterable(quizzes))
 
         with self.assertRaises(QuizSessionInterrupted) as context:
             service.play(quiz_catalog)
@@ -439,8 +481,9 @@ class QuizSessionServiceTestCase(unittest.TestCase):
 
         self.assertIsNotNone(partial_performance)
         assert partial_performance is not None
-        self.assertEqual(int(partial_performance.correct_answers()), 1)
-        self.assertEqual(int(partial_performance.hint_usages()), 1)
+        answer_tally = partial_performance.answer_tally
+        self.assertEqual(int(answer_tally.correct_answers), 1)
+        self.assertEqual(int(answer_tally.hint_usages), 1)
 
 
 class ConsoleInputTestCase(unittest.TestCase):
@@ -462,17 +505,18 @@ class QuizRoundCoordinatorTestCase(unittest.TestCase):
             cast(QuizQuestionRoundService, AlwaysIncorrectRoundService()),
             QuizPartialResultBuilder(),
         )
-        factory = QuizFactory()
         quizzes = [
-            factory.create(f"문제{i}", ["A", "B", "C", "D"], 1)
+            create_quiz(f"문제{i}", ["A", "B", "C", "D"], 1)
             for i in range(1200)
         ]
 
-        result = coordinator.play_selected_quizzes(QuizSelection.from_items(quizzes))
+        selection_items = QuizSelectionItems.from_iterable(quizzes)
+        result = coordinator.play_selected_quizzes(QuizSelection(selection_items))
 
-        self.assertEqual(int(result.question_count()), 1200)
-        self.assertEqual(int(result.correct_answers()), 0)
-        self.assertEqual(int(result.hint_usages()), 0)
+        answer_tally = result.answer_tally
+        self.assertEqual(int(result.total_questions), 1200)
+        self.assertEqual(int(answer_tally.correct_answers), 0)
+        self.assertEqual(int(answer_tally.hint_usages), 0)
 
 
 class QuizGameExecutionTestCase(unittest.TestCase):
@@ -510,10 +554,13 @@ class QuizGameTestCase(unittest.TestCase):
     def test_persist_state_delegates_to_state_repository(self):
         repository = DummyStateRepository()
         game = self.make_game(state_repository=repository)
+        quiz_mapper = QuizPayloadMapper()
+        quiz = create_quiz("문제", ["A", "B", "C", "D"], 1)
+        payload_item = quiz_mapper.to_payload_item(quiz)
         game.runtime_state.restore(
-            snapshot_from_payload(
+            snapshot_from_dictionary(
                 {
-                    "quizzes": [QuizFactory().create("문제", ["A", "B", "C", "D"], 1)],
+                    "quizzes": [quiz_mapper._payload_dictionary(payload_item)],
                     "best_score": 50,
                     "history": [],
                 }
@@ -522,9 +569,9 @@ class QuizGameTestCase(unittest.TestCase):
 
         game.persist_state()
 
-        self.assertIsNotNone(repository.saved_snapshot)
-        assert repository.saved_payload is not None
-        self.assertEqual(repository.saved_payload["best_score"], 50)
+        self.assertIsNotNone(repository.saved)
+        assert repository.saved is not None
+        self.assertEqual(repository.saved["best_score"], 50)
 
     def test_persist_state_reports_save_error(self):
         console_interface = DummyConsoleInterface()
@@ -546,8 +593,8 @@ class QuizGameTestCase(unittest.TestCase):
 
         game.initialize_state()
 
-        self.assertGreaterEqual(len(game.runtime_state.quiz_catalog()), 5)
-        self.assertIsNone(game.runtime_state.best_score().to_optional_int())
+        self.assertGreaterEqual(len(game.runtime_state.quiz_catalog), 5)
+        self.assertIsNone(optional_score(game.runtime_state.record_book.best_score))
         self.assertTrue(console_interface.messages)
 
     def test_initialize_state_recovers_on_value_error(self):
@@ -559,7 +606,7 @@ class QuizGameTestCase(unittest.TestCase):
 
         game.initialize_state()
 
-        self.assertGreaterEqual(len(game.runtime_state.quiz_catalog()), 5)
+        self.assertGreaterEqual(len(game.runtime_state.quiz_catalog), 5)
         self.assertTrue(console_interface.errors)
 
     def test_initialize_state_preserves_invalid_file_before_restoring_defaults(self):
@@ -579,18 +626,26 @@ class QuizGameTestCase(unittest.TestCase):
                 broken_text,
             )
             restored_state = StateRepository(state_file).load_state()
-            self.assertGreaterEqual(len(restored_state.quiz_catalog()), 5)
+            self.assertGreaterEqual(len(restored_state.quiz_catalog), 5)
             self.assertTrue(console_interface.errors)
 
     def test_run_persists_partial_result_when_session_is_interrupted(self):
         console_interface = PlayMenuOnceConsoleInterface()
         repository = DummyStateRepository()
-        factory = QuizFactory()
-        repository.loaded_snapshot = snapshot_from_payload(
+        quiz_mapper = QuizPayloadMapper()
+        repository.loaded_state = snapshot_from_dictionary(
             {
                 "quizzes": [
-                    factory.create("문제1", ["A", "B", "C", "D"], 1),
-                    factory.create("문제2", ["A", "B", "C", "D"], 2),
+                    quiz_mapper._payload_dictionary(
+                        quiz_mapper.to_payload_item(
+                            create_quiz("문제1", ["A", "B", "C", "D"], 1)
+                        )
+                    ),
+                    quiz_mapper._payload_dictionary(
+                        quiz_mapper.to_payload_item(
+                            create_quiz("문제2", ["A", "B", "C", "D"], 2)
+                        )
+                    ),
                 ],
                 "best_score": None,
                 "history": [],
@@ -616,11 +671,11 @@ class QuizGameTestCase(unittest.TestCase):
         ):
             game.run()
 
-        self.assertIsNotNone(repository.saved_payload)
-        assert repository.saved_payload is not None
-        self.assertEqual(repository.saved_payload["best_score"], 10)
-        self.assertEqual(len(repository.saved_payload["history"]), 1)
-        self.assertEqual(repository.saved_payload["history"][0]["correct_count"], 1)
+        self.assertIsNotNone(repository.saved)
+        assert repository.saved is not None
+        self.assertEqual(repository.saved["best_score"], 10)
+        self.assertEqual(len(repository.saved["history"]), 1)
+        self.assertEqual(repository.saved["history"][0]["correct_count"], 1)
         self.assertIn(constants.MESSAGE_INTERRUPTED_EXIT, console_interface.messages)
 
 

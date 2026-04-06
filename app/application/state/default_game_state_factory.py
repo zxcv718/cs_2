@@ -1,10 +1,19 @@
-from typing import Any, Optional
+from typing import Optional
 
 import app.config.constants as constants
 from app.application.state.game_record_book import GameRecordBook
 from app.application.state.game_snapshot import GameSnapshot
 from app.model.quiz import Quiz
-from app.model.quiz_catalog import QuizCatalog
+from app.model.quiz_catalog import QuizCatalog, QuizItems
+from app.model.quiz_components import (
+    AnswerNumber,
+    ChoiceDrafts,
+    HintText,
+    QuestionText,
+    QuizDraft,
+    QuizDraftPrompt,
+    QuizDraftSolution,
+)
 from app.model.quiz_factory import QuizFactory
 
 
@@ -29,14 +38,15 @@ class DefaultGameStateFactory:
     def __init__(self, quiz_factory: Optional[QuizFactory] = None) -> None:
         self.quiz_factory = quiz_factory or QuizFactory()
 
-    def _create_quizzes(self) -> list[Quiz]:
+    def _create_quizzes(self) -> QuizItems:
         """
         상수에 들어 있는 기본 퀴즈 데이터를 Quiz 객체 목록으로 변환합니다.
 
         예를 들어 문제 형식이 바뀌거나 Quiz 생성자 인자가 달라져도
         이 메서드만 수정하면 되므로 유지보수가 쉬워집니다.
         """
-        return [self._quiz(item) for item in constants.DEFAULT_QUIZ_DATA]
+        quizzes = (self._default_quiz(item) for item in constants.DEFAULT_QUIZ_DATA)
+        return QuizItems.from_iterable(quizzes)
 
     def create_state(self) -> GameSnapshot:
         """
@@ -47,15 +57,24 @@ class DefaultGameStateFactory:
         - best_score: 아직 최고 점수가 없으므로 None
         - history: 아직 플레이 기록이 없으므로 빈 리스트
         """
+        quiz_items = self._create_quizzes()
+        quiz_catalog = QuizCatalog(quiz_items)
         return GameSnapshot(
-            QuizCatalog.from_items(self._create_quizzes()),
+            quiz_catalog,
             GameRecordBook.create_empty(),
         )
 
-    def _quiz(self, item: dict[str, Any]) -> Quiz:
-        quiz_factory = self.quiz_factory
+    def _default_quiz(self, item) -> Quiz:
         question = item[constants.QUIZ_FIELD_QUESTION]
-        choices = list(item[constants.QUIZ_FIELD_CHOICES])
+        choices = item[constants.QUIZ_FIELD_CHOICES]
         answer = item[constants.QUIZ_FIELD_ANSWER]
         hint = item.get(constants.QUIZ_FIELD_HINT)
-        return quiz_factory.create(question, choices, answer, hint=hint)
+        question_text = QuestionText.from_raw(question)
+        choice_drafts = ChoiceDrafts.from_iterable(choices)
+        answer_number = AnswerNumber.from_raw(answer)
+        hint_text = HintText.from_raw(hint)
+        quiz_draft = QuizDraft(
+            prompt=QuizDraftPrompt(question_text, choice_drafts),
+            solution=QuizDraftSolution(answer_number, hint_text),
+        )
+        return self.quiz_factory.create(quiz_draft)

@@ -1,82 +1,140 @@
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import Optional, cast
 
 import app.config.constants as constants
 from app.model.quiz import Quiz
+from app.model.quiz_components import (
+    AnswerNumber,
+    ChoiceDrafts,
+    HintText,
+    QuestionText,
+    QuizDraft,
+    QuizDraftPrompt,
+    QuizDraftSolution,
+)
 from app.model.quiz_factory import QuizFactory
 
 
-# Quiz와 저장용 딕셔너리 사이 변환을 담당합니다.
+@dataclass(frozen=True)
+class QuizPayloadPrompt:
+    question_text: QuestionText
+    choice_drafts: ChoiceDrafts
+
+
+@dataclass(frozen=True)
+class QuizPayloadSolution:
+    answer_number: AnswerNumber
+    hint_text: HintText | None = None
+
+
+@dataclass(frozen=True)
+class QuizPayloadItem:
+    prompt: QuizPayloadPrompt
+    solution: QuizPayloadSolution
+
+
 class QuizPayloadMapper:
     def __init__(self, quiz_factory: Optional[QuizFactory] = None) -> None:
         self.quiz_factory = quiz_factory or QuizFactory()
 
-    # Quiz 객체를 저장 가능한 딕셔너리로 바꿉니다.
-    def to_payload(self, quiz: Quiz) -> dict[str, Any]:
+    def to_payload_item(self, quiz: Quiz) -> QuizPayloadItem:
         if not isinstance(quiz, Quiz):
             raise ValueError(constants.ERROR_QUIZ_MUST_BE_INSTANCE)
-        item: dict[str, Any] = {
-            constants.QUIZ_FIELD_QUESTION: quiz.question_text(),
-            constants.QUIZ_FIELD_CHOICES: list(quiz.choice_texts()),
-            constants.QUIZ_FIELD_ANSWER: quiz.answer_number(),
-        }
-        hint_text = quiz.hint_text()
-        if hint_text is None:
-            return item
-        item[constants.QUIZ_FIELD_HINT] = hint_text
-        return item
-
-    # 저장된 딕셔너리를 Quiz 객체로 복원합니다.
-    def from_payload(self, item: dict[str, Any]) -> Quiz:
-        valid_item = self._dictionary(item)
-        question = self._question(valid_item)
-        choices = self._choices(valid_item)
-        answer = self._answer(valid_item)
-        hint = self._hint(valid_item)
-        quiz_factory = self.quiz_factory
-        return quiz_factory.create(
-            question=question,
-            choices=choices,
-            answer=answer,
-            hint=hint,
+        prompt = quiz.prompt
+        solution = quiz.solution
+        choice_set = prompt.choice_set
+        choice_values = tuple(choice_set)
+        return QuizPayloadItem(
+            prompt=QuizPayloadPrompt(
+                prompt.question_text,
+                ChoiceDrafts(choice_values),
+            ),
+            solution=QuizPayloadSolution(
+                solution.answer_number,
+                solution.hint_text,
+            ),
         )
 
-    def _dictionary(self, item: dict[str, Any]) -> dict[str, Any]:
-        if isinstance(item, dict):
-            return item
+    def from_payload_item(self, payload_item: QuizPayloadItem) -> Quiz:
+        quiz_factory = self.quiz_factory
+        prompt = payload_item.prompt
+        solution = payload_item.solution
+        quiz_draft = QuizDraft(
+            prompt=QuizDraftPrompt(
+                prompt.question_text,
+                prompt.choice_drafts,
+            ),
+            solution=QuizDraftSolution(
+                solution.answer_number,
+                solution.hint_text,
+            ),
+        )
+        return quiz_factory.create(quiz_draft)
+
+    def _payload_item(self, payload_source: object) -> QuizPayloadItem:
+        return QuizPayloadItem(
+            prompt=QuizPayloadPrompt(
+                self._question_text(payload_source),
+                self._choice_drafts(payload_source),
+            ),
+            solution=QuizPayloadSolution(
+                self._answer_number(payload_source),
+                self._hint_text(payload_source),
+            ),
+        )
+
+    def _payload_dictionary(self, payload_item: QuizPayloadItem) -> object:
+        prompt = payload_item.prompt
+        solution = payload_item.solution
+        choice_drafts = prompt.choice_drafts
+        choice_values = choice_drafts.values
+        payload_dictionary: dict[str, object] = {
+            constants.QUIZ_FIELD_QUESTION: str(prompt.question_text),
+            constants.QUIZ_FIELD_CHOICES: list(choice_values),
+            constants.QUIZ_FIELD_ANSWER: int(solution.answer_number),
+        }
+        hint_text = solution.hint_text
+        if hint_text is None:
+            return payload_dictionary
+        payload_dictionary[constants.QUIZ_FIELD_HINT] = str(hint_text)
+        return payload_dictionary
+
+    def _dictionary(self, payload_source: object) -> object:
+        if isinstance(payload_source, dict):
+            return cast(dict[str, object], payload_source)
         raise ValueError(constants.ERROR_QUIZ_ITEM_MUST_BE_DICTIONARY)
 
-    def _question(self, item: dict[str, Any]) -> str:
+    def _question_text(self, payload_source: object) -> QuestionText:
+        payload_dictionary = cast(dict[str, object], self._dictionary(payload_source))
         question_key = constants.QUIZ_FIELD_QUESTION
-        question = item.get(question_key)
+        question = payload_dictionary.get(question_key)
         if not isinstance(question, str) or not question.strip():
             raise ValueError(constants.ERROR_QUESTION_MUST_BE_NON_EMPTY_STRING)
-        return question
+        return QuestionText.from_raw(question)
 
-    def _choices(self, item: dict[str, Any]) -> list[str]:
+    def _choice_drafts(self, payload_source: object) -> ChoiceDrafts:
+        payload_dictionary = cast(dict[str, object], self._dictionary(payload_source))
         choices_key = constants.QUIZ_FIELD_CHOICES
-        raw_choices = item.get(choices_key)
-        if not isinstance(raw_choices, list) or len(raw_choices) != constants.CHOICE_COUNT:
+        choice_values_from_payload = payload_dictionary.get(choices_key)
+        if not isinstance(choice_values_from_payload, list) or len(choice_values_from_payload) != constants.CHOICE_COUNT:
             error_template = constants.ERROR_CHOICES_LENGTH_TEMPLATE
             raise ValueError(error_template.format(choice_count=constants.CHOICE_COUNT))
-        return [self._choice(choice) for choice in raw_choices]
+        return ChoiceDrafts.from_iterable(choice_values_from_payload)
 
-    def _choice(self, choice: Any) -> str:
-        if not isinstance(choice, str) or not choice.strip():
-            raise ValueError(constants.ERROR_CHOICE_MUST_BE_NON_EMPTY_STRING)
-        return choice
-
-    def _answer(self, item: dict[str, Any]) -> int:
+    def _answer_number(self, payload_source: object) -> AnswerNumber:
+        payload_dictionary = cast(dict[str, object], self._dictionary(payload_source))
         answer_key = constants.QUIZ_FIELD_ANSWER
-        answer = item.get(answer_key)
+        answer = payload_dictionary.get(answer_key)
         if not isinstance(answer, int) or isinstance(answer, bool):
             raise ValueError(constants.ERROR_ANSWER_MUST_BE_INTEGER)
-        return answer
+        return AnswerNumber.from_raw(answer)
 
-    def _hint(self, item: dict[str, Any]) -> str | None:
+    def _hint_text(self, payload_source: object) -> HintText | None:
+        payload_dictionary = cast(dict[str, object], self._dictionary(payload_source))
         hint_key = constants.QUIZ_FIELD_HINT
-        hint = item.get(hint_key)
+        hint = payload_dictionary.get(hint_key)
         if hint is None:
             return None
         if not isinstance(hint, str) or not hint.strip():
             raise ValueError(constants.ERROR_HINT_MUST_BE_NON_EMPTY_STRING)
-        return hint
+        return HintText.from_raw(hint)

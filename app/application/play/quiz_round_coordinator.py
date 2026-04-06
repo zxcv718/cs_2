@@ -32,26 +32,40 @@ class QuizRoundCoordinator:
         total_questions = selected_quizzes.total_questions()
         answer_tally = AnswerTally.empty()
         answered_question_count = QuestionCount(constants.INITIAL_CORRECT_COUNT)
-        for quiz in selected_quizzes:
-            try:
-                round_tally = self._round_result(
-                    quiz,
-                    total_questions,
-                    answered_question_count,
-                )
-            except QuizQuestionRoundInterrupted as interrupted:
-                self._interrupted_result(
-                    total_questions,
-                    answer_tally.add(self._hint_only_tally(interrupted)),
-                    answered_question_count,
-                    interrupted,
-                )
-            answer_tally = answer_tally.add(round_tally)
+        quiz_iterator = iter(selected_quizzes)
+        quiz = next(quiz_iterator, None)
+        while quiz is not None:
+            answer_tally = self._updated_answer_tally(
+                quiz,
+                total_questions,
+                answer_tally,
+                answered_question_count,
+            )
             answered_question_count = answered_question_count.incremented()
-        return self._completed_result(
-            total_questions,
-            answer_tally,
-        )
+            quiz = next(quiz_iterator, None)
+        return self._completed_result(total_questions, answer_tally)
+
+    def _updated_answer_tally(
+        self,
+        quiz: Quiz,
+        total_questions: QuestionCount,
+        answer_tally: AnswerTally,
+        answered_question_count: QuestionCount,
+    ) -> AnswerTally:
+        try:
+            round_tally = self._round_result(
+                quiz,
+                total_questions,
+                answered_question_count,
+            )
+        except QuizQuestionRoundInterrupted as interrupted_round:
+            self._interrupted_result(
+                total_questions,
+                answer_tally.add(self._hint_only_tally(interrupted_round)),
+                answered_question_count,
+                interrupted_round,
+            )
+        return answer_tally.add(round_tally)
 
     def _round_result(
         self,

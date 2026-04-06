@@ -9,8 +9,13 @@ class BestScoreDisplayService:
         console_interface: ConsoleInterface,
         runtime_state: GameRuntimeState,
     ) -> None:
-        display_score = self._score_value_or_none(runtime_state.best_score())
+        record_book = runtime_state.record_book
+        best_score = record_book.best_score
+        display_score = self._score_value_or_none(best_score)
         console_interface.display_best_score(display_score)
 
     def _score_value_or_none(self, best_score: BestScore) -> int | None:
-        return best_score.to_optional_int()
+        score_value = best_score.score_value
+        if score_value is None:
+            return None
+        return int(score_value)

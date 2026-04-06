@@ -65,7 +65,7 @@ class AddMenuAction:
         console_interface: ConsoleInterface,
         runtime_state: GameRuntimeState,
     ) -> None:
-        quiz_catalog = runtime_state.quiz_catalog()
+        quiz_catalog = runtime_state.quiz_catalog
         self.quiz_catalog_creation_service.add_quiz(quiz_catalog)
         self.persistence_service.save_runtime_state(runtime_state)
 
@@ -86,7 +86,7 @@ class ListMenuAction:
         console_interface: ConsoleInterface,
         runtime_state: GameRuntimeState,
     ) -> None:
-        quiz_catalog = runtime_state.quiz_catalog()
+        quiz_catalog = runtime_state.quiz_catalog
         self.quiz_catalog_listing_service.show_quizzes(quiz_catalog)
 
 
@@ -107,7 +107,7 @@ class DeleteMenuAction:
         console_interface: ConsoleInterface,
         runtime_state: GameRuntimeState,
     ) -> None:
-        quiz_catalog = runtime_state.quiz_catalog()
+        quiz_catalog = runtime_state.quiz_catalog
         removed_quiz = self.quiz_catalog_deletion_service.delete_quiz(quiz_catalog)
         if removed_quiz is None:
             return
@@ -157,12 +157,25 @@ class MenuActions:
         console_interface: ConsoleInterface,
         runtime_state: GameRuntimeState,
     ) -> bool:
-        for action in self.menu_action_collection:
-            if not action.matches(menu_choice, delete_menu_availability):
-                continue
-            action.execute(console_interface, runtime_state)
-            return True
-        return False
+        action = self._matching_action(menu_choice, delete_menu_availability)
+        if action is None:
+            return False
+        action.execute(console_interface, runtime_state)
+        return True
+
+    def _matching_action(
+        self,
+        menu_choice: MenuChoice,
+        delete_menu_availability: DeleteMenuAvailability,
+    ) -> MenuAction | None:
+        return next(
+            (
+                action
+                for action in self.menu_action_collection
+                if action.matches(menu_choice, delete_menu_availability)
+            ),
+            None,
+        )
 
     def persist(self, runtime_state: GameRuntimeState) -> None:
         self.persistence_service.save_runtime_state(runtime_state)

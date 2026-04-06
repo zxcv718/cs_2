@@ -34,7 +34,8 @@ class GameExitPersistence:
             persistence_service = self.persistence_service
             score_outcome = result_recorder.record(runtime_state, result)
             persistence_service.save_runtime_state(runtime_state)
-            return score_outcome.record_update_status()
+            best_score_update = score_outcome.best_score_update
+            return best_score_update.record_update_status
 
         persistence_service = self.persistence_service
         persistence_service.save_runtime_state(runtime_state)

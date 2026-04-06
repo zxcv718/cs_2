@@ -17,8 +17,8 @@ class QuestionCount:
     value: int
 
     def __post_init__(self) -> None:
-        raw_value = self.value
-        self.value = _validate_non_negative(raw_value)
+        metric_value = self.value
+        self.value = _validate_non_negative(metric_value)
 
     def __int__(self) -> int:
         return self.value
@@ -37,8 +37,8 @@ class CorrectAnswerCount:
     value: int
 
     def __post_init__(self) -> None:
-        raw_value = self.value
-        self.value = _validate_non_negative(raw_value)
+        metric_value = self.value
+        self.value = _validate_non_negative(metric_value)
 
     def __int__(self) -> int:
         return self.value
@@ -57,8 +57,8 @@ class HintUsageCount:
     value: int
 
     def __post_init__(self) -> None:
-        raw_value = self.value
-        self.value = _validate_non_negative(raw_value)
+        metric_value = self.value
+        self.value = _validate_non_negative(metric_value)
 
     def __int__(self) -> int:
         return self.value
@@ -82,8 +82,8 @@ class ScoreValue:
     value: int
 
     def __post_init__(self) -> None:
-        raw_value = self.value
-        self.value = _validate_non_negative(raw_value)
+        metric_value = self.value
+        self.value = _validate_non_negative(metric_value)
 
     def __int__(self) -> int:
         return self.value
@@ -97,8 +97,8 @@ class MenuChoice:
     value: int
 
     def __post_init__(self) -> None:
-        raw_value = self.value
-        self.value = _validate_non_negative(raw_value)
+        metric_value = self.value
+        self.value = _validate_non_negative(metric_value)
 
     def __int__(self) -> int:
         return self.value
@@ -124,8 +124,8 @@ class DisplayIndex:
     value: int
 
     def __post_init__(self) -> None:
-        raw_value = self.value
-        self.value = _validate_non_negative(raw_value)
+        metric_value = self.value
+        self.value = _validate_non_negative(metric_value)
         display_index_start = constants.DISPLAY_INDEX_START
         if self.value < display_index_start:
             raise ValueError("display index must start from one")

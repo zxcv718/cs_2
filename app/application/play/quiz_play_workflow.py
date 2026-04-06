@@ -19,7 +19,7 @@ class QuizPlayWorkflow:
         runtime_state: GameRuntimeState,
     ) -> None:
         quiz_session_service = self.quiz_session_service
-        quiz_catalog = runtime_state.quiz_catalog()
+        quiz_catalog = runtime_state.quiz_catalog
         result = quiz_session_service.play(quiz_catalog)
         if result is None:
             return
