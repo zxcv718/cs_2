@@ -1,7 +1,8 @@
 # Mission 2 Quiz Game
 
 Python 콘솔 환경에서 동작하는 퀴즈 게임입니다.  
-현재 구조는 `state.json` 기반 영속성, 단일책임원칙(SRP), 객체지향 생활 체조 9원칙, 그리고 책임이 드러나는 패키지 경계를 함께 맞추는 방향으로 정리되어 있습니다.
+현재 구조는 `state.json` 기반 영속성, 단일책임원칙(SRP), 객체지향 생활 체조 9원칙, 그리고 책임이 드러나는 패키지 경계를 함께 맞추는 방향으로 정리되어 있습니다.  
+최근에는 `rule 6`과 `rule 9` 쪽 잔여 지점을 줄이기 위해 콘솔/저장소 계층을 더 작은 역할 객체로 분해했고, `app/`는 `__init__.py` 없는 namespace package 형태로 정리했습니다.
 
 ## 퀴즈 주제와 선정 이유
 
@@ -28,6 +29,7 @@ python3 main.py
 ## 검증
 
 ```bash
+python3 -m pytest -q tests/test_architecture.py
 python3 -m pytest -q
 python3 -m unittest -q
 pyright /Users/ilim/Downloads/week2/cs_2
@@ -57,9 +59,7 @@ pyright /Users/ilim/Downloads/week2/cs_2
 
 ```text
 app/
-├── __init__.py
 ├── application/
-│   ├── __init__.py
 │   ├── menu_action_dispatcher.py
 │   ├── menu_execution.py
 │   ├── quiz_game.py
@@ -67,12 +67,10 @@ app/
 │   ├── quiz_game_factory.py
 │   ├── quiz_game_runner.py
 │   ├── catalog/
-│   │   ├── __init__.py
 │   │   ├── quiz_catalog_creation_service.py
 │   │   ├── quiz_catalog_deletion_service.py
 │   │   └── quiz_catalog_listing_service.py
 │   ├── play/
-│   │   ├── __init__.py
 │   │   ├── best_score_service.py
 │   │   ├── question_count_chooser.py
 │   │   ├── quiz_history_service.py
@@ -87,7 +85,6 @@ app/
 │   │   ├── quiz_session_models.py
 │   │   └── quiz_session_service.py
 │   └── state/
-│       ├── __init__.py
 │       ├── default_game_state_factory.py
 │       ├── default_state_recovery.py
 │       ├── game_bootstrap_service.py
@@ -101,31 +98,25 @@ app/
 │       ├── game_state_service.py
 │       └── quiz_history_entry.py
 ├── config/
-│   ├── __init__.py
 │   └── constants.py
 ├── console/
-│   ├── __init__.py
 │   ├── input.py
 │   ├── interface.py
 │   └── output.py
 ├── model/
-│   ├── __init__.py
 │   ├── quiz.py
 │   ├── quiz_catalog.py
 │   ├── quiz_components.py
 │   ├── quiz_factory.py
 │   └── quiz_selection.py
 ├── presentation/
-│   ├── __init__.py
 │   ├── best_score_display_service.py
 │   └── quiz_presenter.py
 ├── repository/
-│   ├── __init__.py
 │   ├── quiz_payload_mapper.py
 │   ├── state_payload_mapper.py
 │   └── state_repository.py
 └── service/
-    ├── __init__.py
     └── quiz_metrics.py
 ```
 
@@ -134,9 +125,9 @@ app/
 ### `app/console`
 
 - 콘솔 입출력 경계
-- `input.py`: 숫자, 문자열, yes/no, 정답/힌트 입력 검증
-- `output.py`: 메뉴, 문제, 결과, 목록, 오류 메시지 출력
-- `interface.py`: 입력/출력을 묶는 얇은 facade
+- `input.py`: `ConsoleInput` facade와 숫자/문자열/yes-no/정답-또는-힌트 입력 역할 객체
+- `output.py`: 메뉴, 메시지, 목록, 문제, 결과 출력 책임을 더 작은 출력 역할 객체로 분리
+- `interface.py`: `ConsoleReader`, `ConsoleWriter`를 합친 얇은 facade
 
 ### `app/application`
 
@@ -186,7 +177,9 @@ app/
 
 - 파일 입출력과 payload 변환 경계
 - `StateRepository`: `GameSnapshot` <-> `state.json` 읽기/쓰기, atomic 저장, 손상 파일 백업 지원
+  - 내부적으로 loader / writer / backup helper를 분리
 - `StatePayloadMapper`: `GameSnapshot` 기준 전체 상태 스키마 검증/복원
+  - 내부적으로 reader / writer / history translator 역할로 분리
 - `QuizPayloadMapper`: `Quiz` <-> payload 변환
 
 ### `app/service`
@@ -205,7 +198,22 @@ app/
 - 직접 리스트 조작 대신 일급 컬렉션 사용
 - runtime state와 history를 raw `dict` 대신 snapshot/value object로 다룸
 - 구조 규칙을 테스트로 고정
+- repo-local strict 기준으로 `rule 6`을 메서드 수 상한으로 운영하고, `rule 9`는 public direct-field-return 금지로 고정
 - 실행 흐름, 저장, 복구, 점수 정책, 콘솔 입출력, 표현 책임 분리
+
+## 구조 규칙 메모
+
+- `app/`는 Python namespace package 형태로 사용하고 있어서 `app/**/__init__.py`는 두지 않습니다.
+- 대신 `tests/__init__.py`는 `python3 -m unittest -q` discovery 호환을 위해 유지합니다.
+- 구조 검사는 `tests/test_architecture.py` 에서 고정합니다.
+- 현재 구조 테스트는 다음을 검사합니다.
+  - `else` 금지
+  - getter/setter/property 금지
+  - public method의 direct field return 금지
+  - 인스턴스 변수 2개 이하
+  - production class 메서드 수 상한 `10`
+  - raw `list/dict/Any` annotation 금지
+  - runtime train-wreck 호출 금지
 
 ## 데이터 파일
 
