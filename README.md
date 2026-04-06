@@ -174,22 +174,3 @@ app/
   ]
 }
 ```
-
-## 테스트 파일
-
-- [test_quiz.py](/Users/ilim/Downloads/week2/cs_2/tests/test_quiz.py)
-- [test_state_repository.py](/Users/ilim/Downloads/week2/cs_2/tests/test_state_repository.py)
-- [test_quiz_game.py](/Users/ilim/Downloads/week2/cs_2/tests/test_quiz_game.py)
-
-이 테스트들은 도메인 규칙, 저장소 스키마, 세션/런타임 흐름을 보호합니다.
-
-## 최근 리팩터링 커밋
-
-```text
-55f04b2 Tighten metric wrappers to close the remaining calisthenics gaps
-a0f68bc Finish the calisthenics cleanup under the current Python design
-25c9eb3 Move console boundary and keep the refactor green
-520f10b Wrap core quiz metrics and remove remaining control-flow shortcuts
-2161b03 Push domain wrappers and menu flow toward calisthenics compliance
-27ce941 Reduce coordinator state while preserving quiz behavior
-```
