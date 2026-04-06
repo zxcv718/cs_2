@@ -1,7 +1,8 @@
-import app.config.constants as c
+import app.config.constants as constants
 from app.model.quiz import Quiz
 from app.model.quiz_catalog import QuizCatalog
 from app.model.quiz_factory import QuizFactory
+from app.service.quiz_metrics import DisplayIndex
 from app.ui.console_ui import ConsoleUI
 from typing import Optional
 
@@ -18,28 +19,29 @@ class QuizCatalogService:
 
     # 새 퀴즈 정보를 입력받아 목록에 추가합니다.
     def add_quiz(self, quiz_catalog: QuizCatalog) -> bool:
-        question = self.console_interface.get_non_empty_text(c.PROMPT_ENTER_QUESTION)
+        console_interface = self.console_interface
+        quiz_factory = self.quiz_factory
+        question_prompt = constants.PROMPT_ENTER_QUESTION
+        question = console_interface.request_non_empty_text(question_prompt)
         choices = [
-            self.console_interface.get_non_empty_text(
-                c.PROMPT_ENTER_CHOICE_TEMPLATE.format(index=index)
+            console_interface.request_non_empty_text(self._choice_prompt(index))
+            for index in range(
+                constants.DISPLAY_INDEX_START,
+                constants.CHOICE_COUNT + constants.DISPLAY_INDEX_START,
             )
-            for index in range(c.DISPLAY_INDEX_START, c.CHOICE_COUNT + c.DISPLAY_INDEX_START)
         ]
-        answer = self.console_interface.get_valid_number(
-            c.PROMPT_ENTER_ANSWER_TEMPLATE.format(
-                min_answer=c.MIN_ANSWER,
-                max_answer=c.MAX_ANSWER,
-            ),
-            c.MIN_ANSWER,
-            c.MAX_ANSWER,
+        answer = console_interface.request_valid_number(
+            self._answer_prompt(),
+            constants.MIN_ANSWER,
+            constants.MAX_ANSWER,
         )
 
         hint = None
-        if self.console_interface.get_yes_no(c.PROMPT_ADD_HINT_CONFIRM):
-            hint = self.console_interface.get_non_empty_text(c.PROMPT_ENTER_HINT)
+        if console_interface.request_yes_no(constants.PROMPT_ADD_HINT_CONFIRM):
+            hint = console_interface.request_non_empty_text(constants.PROMPT_ENTER_HINT)
 
-        quiz_catalog.append(self.quiz_factory.create(question, choices, answer, hint=hint))
-        self.console_interface.show_message(c.MESSAGE_QUIZ_ADDED)
+        quiz_catalog.append(quiz_factory.create(question, choices, answer, hint=hint))
+        console_interface.show_message(constants.MESSAGE_QUIZ_ADDED)
         return True
 
     # 퀴즈 전체 목록을 화면에 보여줍니다.
@@ -48,25 +50,43 @@ class QuizCatalogService:
 
     # 사용자가 고른 번호의 퀴즈를 삭제합니다.
     def delete_quiz(self, quiz_catalog: QuizCatalog) -> bool:
-        if not quiz_catalog.has_items():
-            self.console_interface.show_message(c.MESSAGE_NO_QUIZZES_TO_DELETE)
+        console_interface = self.console_interface
+        if not quiz_catalog:
+            console_interface.show_message(constants.MESSAGE_NO_QUIZZES_TO_DELETE)
             return False
 
-        self.console_interface.show_quiz_list(quiz_catalog)
-        index = self.console_interface.get_valid_number(
-            c.PROMPT_DELETE_INDEX_TEMPLATE.format(count=quiz_catalog.display_count()),
-            c.DISPLAY_INDEX_START,
-            quiz_catalog.display_count(),
+        console_interface.show_quiz_list(quiz_catalog)
+        index = console_interface.request_valid_number(
+            self._delete_prompt(len(quiz_catalog)),
+            constants.DISPLAY_INDEX_START,
+            len(quiz_catalog),
         )
 
-        if not self.console_interface.get_yes_no(c.PROMPT_DELETE_CONFIRM):
-            self.console_interface.show_message(c.MESSAGE_DELETE_CANCELLED)
+        if not console_interface.request_yes_no(constants.PROMPT_DELETE_CONFIRM):
+            console_interface.show_message(constants.MESSAGE_DELETE_CANCELLED)
             return False
 
-        removed_quiz = quiz_catalog.remove_by_display_index(index)
-        self.console_interface.show_message(
-            c.MESSAGE_DELETE_SUCCESS_TEMPLATE.format(
-                question=removed_quiz.payload_item()[c.QUIZ_FIELD_QUESTION]
-            )
-        )
+        removed_quiz = quiz_catalog.remove_by_display_index(DisplayIndex(index))
+        console_interface.show_message(self._deleted_message(removed_quiz))
         return True
+
+    def _choice_prompt(self, index: int) -> str:
+        template = constants.PROMPT_ENTER_CHOICE_TEMPLATE
+        return template.format(index=index)
+
+    def _answer_prompt(self) -> str:
+        template = constants.PROMPT_ENTER_ANSWER_TEMPLATE
+        return template.format(
+            min_answer=constants.MIN_ANSWER,
+            max_answer=constants.MAX_ANSWER,
+        )
+
+    def _delete_prompt(self, quiz_count: int) -> str:
+        template = constants.PROMPT_DELETE_INDEX_TEMPLATE
+        return template.format(count=quiz_count)
+
+    def _deleted_message(self, removed_quiz: Quiz) -> str:
+        payload_item = removed_quiz.payload_item()
+        question = payload_item[constants.QUIZ_FIELD_QUESTION]
+        template = constants.MESSAGE_DELETE_SUCCESS_TEMPLATE
+        return template.format(question=question)

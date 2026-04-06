@@ -20,6 +20,3 @@ class GameHistory:
 
     def append(self, entry: dict[str, Any]) -> None:
         self.entries.append(entry)
-
-    def persistable_entries(self) -> list[dict[str, Any]]:
-        return list(self.entries)

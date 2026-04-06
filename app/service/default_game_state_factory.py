@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-import app.config.constants as c
+import app.config.constants as constants
 from app.model.quiz import Quiz
 from app.model.quiz_factory import QuizFactory
 
@@ -35,12 +35,12 @@ class DefaultGameStateFactory:
         """
         return [
             self.quiz_factory.create(
-                item[c.QUIZ_FIELD_QUESTION],
-                list(item[c.QUIZ_FIELD_CHOICES]),
-                item[c.QUIZ_FIELD_ANSWER],
-                hint=item.get(c.QUIZ_FIELD_HINT),
+                item[constants.QUIZ_FIELD_QUESTION],
+                list(item[constants.QUIZ_FIELD_CHOICES]),
+                item[constants.QUIZ_FIELD_ANSWER],
+                hint=item.get(constants.QUIZ_FIELD_HINT),
             )
-            for item in c.DEFAULT_QUIZ_DATA
+            for item in constants.DEFAULT_QUIZ_DATA
         ]
 
     def create_state(self) -> dict[str, Any]:
@@ -53,7 +53,7 @@ class DefaultGameStateFactory:
         - history: 아직 플레이 기록이 없으므로 빈 리스트
         """
         return {
-            c.STATE_KEY_QUIZZES: self.create_quizzes(),
-            c.STATE_KEY_BEST_SCORE: None,
-            c.STATE_KEY_HISTORY: [],
+            constants.STATE_KEY_QUIZZES: self.create_quizzes(),
+            constants.STATE_KEY_BEST_SCORE: None,
+            constants.STATE_KEY_HISTORY: [],
         }

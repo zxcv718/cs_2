@@ -1,4 +1,3 @@
-import app.config.constants as c
 from app.repository.state_repository import StateRepository
 from app.service.best_score_service import BestScoreService
 from app.service.default_game_state_factory import DefaultGameStateFactory

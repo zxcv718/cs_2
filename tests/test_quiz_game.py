@@ -1,7 +1,7 @@
 import unittest
 from typing import Optional
 
-import app.config.constants as c
+import app.config.constants as constants
 from app.model.quiz import Quiz
 from app.model.quiz_catalog import QuizCatalog
 from app.model.quiz_factory import QuizFactory
@@ -11,6 +11,14 @@ from app.service.default_game_state_factory import DefaultGameStateFactory
 from app.service.game_state_service import GameStateService
 from app.service.quiz_game import QuizGame
 from app.service.quiz_history_service import QuizHistoryService
+from app.service.quiz_metrics import (
+    CorrectAnswerCount,
+    DisplayIndex,
+    HintUsageCount,
+    MenuChoice,
+    QuestionCount,
+    ScoreValue,
+)
 from app.service.quiz_partial_result_builder import QuizPartialResultBuilder
 from app.service.quiz_question_round_service import QuizQuestionRoundService
 from app.service.quiz_scoring_service import QuizScoringService
@@ -39,8 +47,8 @@ class PlayMenuOnceUI(DummyUI):
     def show_menu(self, has_delete=False):
         return None
 
-    def get_menu_choice(self, min_value, max_value):
-        return c.MENU_PLAY
+    def request_menu_choice(self, min_value, max_value):
+        return MenuChoice(constants.MENU_PLAY)
 
     def show_result(self, correct_count, score, total_questions, hint_used_count=0):
         return None
@@ -51,13 +59,13 @@ class InterruptingSessionUI(DummyUI):
         super().__init__()
         self.answer_call_count = 0
 
-    def get_valid_number(self, prompt, min_value, max_value):
+    def request_valid_number(self, prompt, min_value, max_value):
         return 2
 
     def show_question(self, quiz, index, total):
         return None
 
-    def get_answer_or_hint(self, prompt, min_value=1, max_value=4):
+    def request_answer_or_hint(self, prompt, min_value=1, max_value=4):
         self.answer_call_count += 1
         if self.answer_call_count == 1:
             return 1
@@ -72,10 +80,10 @@ class HintThenCorrectUI(DummyUI):
     def show_question(self, quiz, index, total):
         return None
 
-    def get_answer_or_hint(self, prompt, min_value=1, max_value=4):
+    def request_answer_or_hint(self, prompt, min_value=1, max_value=4):
         self.answer_call_count += 1
         if self.answer_call_count == 1:
-            return c.HINT_COMMAND_VALUE
+            return constants.HINT_COMMAND_VALUE
         return 2
 
 
@@ -84,18 +92,18 @@ class AnswerThenHintThenInterruptUI(DummyUI):
         super().__init__()
         self.answer_call_count = 0
 
-    def get_valid_number(self, prompt, min_value, max_value):
+    def request_valid_number(self, prompt, min_value, max_value):
         return 2
 
     def show_question(self, quiz, index, total):
         return None
 
-    def get_answer_or_hint(self, prompt, min_value=1, max_value=4):
+    def request_answer_or_hint(self, prompt, min_value=1, max_value=4):
         self.answer_call_count += 1
         if self.answer_call_count == 1:
             return 1
         if self.answer_call_count == 2:
-            return c.HINT_COMMAND_VALUE
+            return constants.HINT_COMMAND_VALUE
         raise KeyboardInterrupt
 
 
@@ -143,7 +151,7 @@ class FailingSaveStateRepository(DummyStateRepository):
 
 class DeterministicQuizSessionService(QuizSessionService):
     def _select_quizzes(self, quiz_catalog, question_count):
-        return list(quiz_catalog)[:question_count]
+        return list(quiz_catalog)[: int(question_count)]
 
 
 class InterruptedSessionService(QuizSessionService):
@@ -192,27 +200,33 @@ class BestScoreServiceTestCase(unittest.TestCase):
     def test_update_best_score_sets_first_score(self):
         service = BestScoreService()
 
-        best_score, is_new_record = service.update_best_score(None, 30)
+        best_score, is_new_record = service.update_best_score(None, ScoreValue(30))
 
-        self.assertEqual(best_score, 30)
+        self.assertEqual(int(best_score), 30)
         self.assertTrue(is_new_record)
 
     # 더 높은 점수가 나오면 최고 점수가 바뀌어야 합니다.
     def test_update_best_score_replaces_lower_score(self):
         service = BestScoreService()
 
-        best_score, is_new_record = service.update_best_score(20, 30)
+        best_score, is_new_record = service.update_best_score(
+            ScoreValue(20),
+            ScoreValue(30),
+        )
 
-        self.assertEqual(best_score, 30)
+        self.assertEqual(int(best_score), 30)
         self.assertTrue(is_new_record)
 
     # 더 낮은 점수는 최고 점수를 바꾸면 안 됩니다.
     def test_update_best_score_keeps_higher_score(self):
         service = BestScoreService()
 
-        best_score, is_new_record = service.update_best_score(40, 30)
+        best_score, is_new_record = service.update_best_score(
+            ScoreValue(40),
+            ScoreValue(30),
+        )
 
-        self.assertEqual(best_score, 40)
+        self.assertEqual(int(best_score), 40)
         self.assertFalse(is_new_record)
 
 
@@ -222,25 +236,34 @@ class QuizScoringServiceTestCase(unittest.TestCase):
     def test_calculate_score_without_hint(self):
         service = QuizScoringService()
 
-        score = service.calculate_score(correct_count=4, hint_used_count=0)
+        score = service.calculate_score(
+            correct_count=CorrectAnswerCount(4),
+            hint_used_count=HintUsageCount(0),
+        )
 
-        self.assertEqual(score, 40)
+        self.assertEqual(int(score), 40)
 
     # 힌트를 쓰면 감점이 반영되어야 합니다.
     def test_calculate_score_with_hint_penalty(self):
         service = QuizScoringService(hint_penalty=2)
 
-        score = service.calculate_score(correct_count=4, hint_used_count=1)
+        score = service.calculate_score(
+            correct_count=CorrectAnswerCount(4),
+            hint_used_count=HintUsageCount(1),
+        )
 
-        self.assertEqual(score, 38)
+        self.assertEqual(int(score), 38)
 
     # 감점이 커도 최종 점수는 0점 아래로 내려가면 안 됩니다.
     def test_calculate_score_never_goes_below_zero(self):
         service = QuizScoringService(hint_penalty=20)
 
-        score = service.calculate_score(correct_count=1, hint_used_count=1)
+        score = service.calculate_score(
+            correct_count=CorrectAnswerCount(1),
+            hint_used_count=HintUsageCount(1),
+        )
 
-        self.assertEqual(score, 0)
+        self.assertEqual(int(score), 0)
 
 
 # 플레이 결과를 history 형식으로 바꾸는 서비스를 테스트합니다.
@@ -249,12 +272,12 @@ class QuizHistoryServiceTestCase(unittest.TestCase):
     def test_create_entry_returns_expected_fields(self):
         service = QuizHistoryService()
         result = QuizSessionResult(
-            total_questions=5,
-            correct_count=4,
-            hint_used_count=1,
+            total_questions=QuestionCount(5),
+            correct_count=CorrectAnswerCount(4),
+            hint_used_count=HintUsageCount(1),
         )
 
-        item = service.create_entry(result, score=38)
+        item = service.create_entry(result, score=ScoreValue(38))
 
         self.assertEqual(item["total_questions"], 5)
         self.assertEqual(item["correct_count"], 4)
@@ -265,25 +288,29 @@ class QuizHistoryServiceTestCase(unittest.TestCase):
 
 class QuizSelectionServiceTestCase(unittest.TestCase):
     def test_choose_question_count_delegates_to_ui(self):
-        ui = InterruptingSessionUI()
-        service = QuizSelectionService(ui)
+        console_interface = InterruptingSessionUI()
+        service = QuizSelectionService(console_interface)
 
         question_count = service.choose_question_count(5)
 
-        self.assertEqual(question_count, 2)
+        self.assertEqual(int(question_count), 2)
 
 
 class QuizQuestionRoundServiceTestCase(unittest.TestCase):
     def test_play_round_counts_hint_and_correct_answer(self):
-        ui = HintThenCorrectUI()
-        service = QuizQuestionRoundService(ui)
+        console_interface = HintThenCorrectUI()
+        service = QuizQuestionRoundService(console_interface)
         quiz = QuizFactory().create("문제", ["A", "B", "C", "D"], 2, hint="힌트")
 
-        result = service.play_round(quiz, index=1, total_questions=3)
+        result = service.play_round(
+            quiz,
+            index=DisplayIndex(1),
+            total_questions=QuestionCount(3),
+        )
 
-        self.assertEqual(result.correct_count, 1)
-        self.assertEqual(result.hint_used_count, 1)
-        self.assertTrue(ui.messages)
+        self.assertEqual(int(result.correct_count), 1)
+        self.assertEqual(int(result.hint_used_count), 1)
+        self.assertTrue(console_interface.messages)
 
 
 class QuizPartialResultBuilderTestCase(unittest.TestCase):
@@ -291,10 +318,10 @@ class QuizPartialResultBuilderTestCase(unittest.TestCase):
         builder = QuizPartialResultBuilder()
 
         result = builder.build_interrupted_result(
-            total_questions=3,
-            correct_count=0,
-            hint_used_count=0,
-            answered_question_count=0,
+            total_questions=QuestionCount(3),
+            correct_count=CorrectAnswerCount(0),
+            hint_used_count=HintUsageCount(0),
+            answered_question_count=QuestionCount(0),
         )
 
         self.assertIsNone(result)
@@ -302,8 +329,8 @@ class QuizPartialResultBuilderTestCase(unittest.TestCase):
 
 class QuizSessionServiceTestCase(unittest.TestCase):
     def test_play_raises_interrupted_with_partial_result_after_answer(self):
-        ui = InterruptingSessionUI()
-        service = DeterministicQuizSessionService(ui)
+        console_interface = InterruptingSessionUI()
+        service = DeterministicQuizSessionService(console_interface)
         factory = QuizFactory()
         quizzes = [
             factory.create("문제1", ["A", "B", "C", "D"], 1),
@@ -318,13 +345,13 @@ class QuizSessionServiceTestCase(unittest.TestCase):
 
         self.assertIsNotNone(partial_result)
         assert partial_result is not None
-        self.assertEqual(partial_result.total_questions, 2)
-        self.assertEqual(partial_result.correct_count, 1)
-        self.assertEqual(partial_result.hint_used_count, 0)
+        self.assertEqual(int(partial_result.total_questions), 2)
+        self.assertEqual(int(partial_result.correct_count), 1)
+        self.assertEqual(int(partial_result.hint_used_count), 0)
 
     def test_play_keeps_hint_count_when_interrupted_after_showing_hint(self):
-        ui = AnswerThenHintThenInterruptUI()
-        service = DeterministicQuizSessionService(ui)
+        console_interface = AnswerThenHintThenInterruptUI()
+        service = DeterministicQuizSessionService(console_interface)
         factory = QuizFactory()
         quizzes = [
             factory.create("문제1", ["A", "B", "C", "D"], 1, hint="힌트1"),
@@ -339,8 +366,8 @@ class QuizSessionServiceTestCase(unittest.TestCase):
 
         self.assertIsNotNone(partial_result)
         assert partial_result is not None
-        self.assertEqual(partial_result.correct_count, 1)
-        self.assertEqual(partial_result.hint_used_count, 1)
+        self.assertEqual(int(partial_result.correct_count), 1)
+        self.assertEqual(int(partial_result.hint_used_count), 1)
 
 
 # QuizGame이 하위 서비스를 제대로 호출하는지 테스트합니다.
@@ -349,11 +376,11 @@ class QuizGameTestCase(unittest.TestCase):
     def make_game(
         self,
         state_repository: Optional[DummyStateRepository] = None,
-        ui: Optional[DummyUI] = None,
+        console_interface_override: Optional[DummyUI] = None,
     ) -> QuizGame:
         console_interface = DummyUI()
-        if ui is not None:
-            console_interface = ui
+        if console_interface_override is not None:
+            console_interface = console_interface_override
 
         repository = DummyStateRepository()
         if state_repository is not None:
@@ -379,40 +406,46 @@ class QuizGameTestCase(unittest.TestCase):
 
     # 저장 실패 시 UI에 오류를 보여줘야 합니다.
     def test_persist_state_reports_save_error(self):
-        ui = DummyUI()
-        game = self.make_game(state_repository=FailingSaveStateRepository(), ui=ui)
+        console_interface = DummyUI()
+        game = self.make_game(
+            state_repository=FailingSaveStateRepository(),
+            console_interface_override=console_interface,
+        )
 
         game.persist_state()
 
-        self.assertTrue(ui.errors)
+        self.assertTrue(console_interface.errors)
 
     # 저장 파일이 없으면 게임 상태를 기본값으로 준비해야 합니다.
     def test_initialize_state_uses_defaults_when_file_missing(self):
-        ui = DummyUI()
-        game = self.make_game(state_repository=MissingStateRepository(), ui=ui)
+        console_interface = DummyUI()
+        game = self.make_game(
+            state_repository=MissingStateRepository(),
+            console_interface_override=console_interface,
+        )
 
         game.initialize_state()
 
         self.assertGreaterEqual(len(game.runtime_state.quiz_catalog), 5)
         self.assertIsNone(game.runtime_state.game_lifecycle.record_book.best_score)
-        self.assertEqual(
-            game.runtime_state.game_lifecycle.record_book.history.persistable_entries(),
-            [],
-        )
-        self.assertTrue(ui.messages)
+        self.assertEqual(list(game.runtime_state.game_lifecycle.record_book.history), [])
+        self.assertTrue(console_interface.messages)
 
     # 저장 파일이 잘못되면 오류를 표시하고 복구해야 합니다.
     def test_initialize_state_recovers_on_value_error(self):
-        ui = DummyUI()
-        game = self.make_game(state_repository=BrokenStateRepository(), ui=ui)
+        console_interface = DummyUI()
+        game = self.make_game(
+            state_repository=BrokenStateRepository(),
+            console_interface_override=console_interface,
+        )
 
         game.initialize_state()
 
         self.assertGreaterEqual(len(game.runtime_state.quiz_catalog), 5)
-        self.assertTrue(ui.errors)
+        self.assertTrue(console_interface.errors)
 
     def test_run_persists_partial_result_when_session_is_interrupted(self):
-        ui = PlayMenuOnceUI()
+        console_interface = PlayMenuOnceUI()
         repository = DummyStateRepository()
         factory = QuizFactory()
         repository.loaded_state = {
@@ -423,12 +456,15 @@ class QuizGameTestCase(unittest.TestCase):
             "best_score": None,
             "history": [],
         }
-        game = self.make_game(state_repository=repository, ui=ui)
+        game = self.make_game(
+            state_repository=repository,
+            console_interface_override=console_interface,
+        )
         game.quiz_game_runner.quiz_game_execution.menu_action_dispatcher.menu_execution.quiz_play_workflow.quiz_session_service = InterruptedSessionService(
             QuizSessionResult(
-                total_questions=2,
-                correct_count=1,
-                hint_used_count=0,
+                total_questions=QuestionCount(2),
+                correct_count=CorrectAnswerCount(1),
+                hint_used_count=HintUsageCount(0),
             )
         )
 
@@ -439,7 +475,7 @@ class QuizGameTestCase(unittest.TestCase):
         self.assertEqual(repository.saved["best_score"], 10)
         self.assertEqual(len(repository.saved["history"]), 1)
         self.assertEqual(repository.saved["history"][0]["correct_count"], 1)
-        self.assertIn(c.MESSAGE_INTERRUPTED_EXIT, ui.messages)
+        self.assertIn(constants.MESSAGE_INTERRUPTED_EXIT, console_interface.messages)
 
 
 if __name__ == "__main__":

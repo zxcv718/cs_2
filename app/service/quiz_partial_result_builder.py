@@ -1,4 +1,5 @@
-import app.config.constants as c
+import app.config.constants as constants
+from app.service.quiz_metrics import CorrectAnswerCount, HintUsageCount, QuestionCount
 from app.service.quiz_session_models import QuizSessionResult
 from typing import Optional
 
@@ -6,9 +7,9 @@ from typing import Optional
 class QuizPartialResultBuilder:
     def build_completed_result(
         self,
-        total_questions: int,
-        correct_count: int,
-        hint_used_count: int,
+        total_questions: QuestionCount,
+        correct_count: CorrectAnswerCount,
+        hint_used_count: HintUsageCount,
     ) -> QuizSessionResult:
         return QuizSessionResult(
             total_questions=total_questions,
@@ -18,12 +19,12 @@ class QuizPartialResultBuilder:
 
     def build_interrupted_result(
         self,
-        total_questions: int,
-        correct_count: int,
-        hint_used_count: int,
-        answered_question_count: int,
+        total_questions: QuestionCount,
+        correct_count: CorrectAnswerCount,
+        hint_used_count: HintUsageCount,
+        answered_question_count: QuestionCount,
     ) -> Optional[QuizSessionResult]:
-        if answered_question_count < c.DISPLAY_INDEX_START:
+        if int(answered_question_count) < constants.DISPLAY_INDEX_START:
             return None
 
         return self.build_completed_result(

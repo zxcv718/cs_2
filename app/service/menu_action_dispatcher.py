@@ -1,7 +1,8 @@
-import app.config.constants as c
+import app.config.constants as constants
 from app.service.game_runtime_state import GameRuntimeState
 from app.service.game_shutdown_service import GameShutdownService
 from app.service.menu_execution import MenuExecution
+from app.service.quiz_metrics import MenuChoice
 from app.ui.console_ui import ConsoleUI
 
 
@@ -16,48 +17,48 @@ class MenuActionDispatcher:
 
     def dispatch(
         self,
-        choice: int,
+        menu_choice: MenuChoice,
         runtime_state: GameRuntimeState,
         has_delete: bool,
         console_interface: ConsoleUI,
     ) -> bool:
-        if choice == c.MENU_PLAY:
-            self.menu_execution.play(console_interface, runtime_state)
+        menu_execution = self.menu_execution
+        game_shutdown_service = self.game_shutdown_service
+        if menu_choice.matches(constants.MENU_PLAY):
+            menu_execution.play(console_interface, runtime_state)
             return True
 
-        if choice == c.MENU_ADD:
-            self.menu_execution.add(runtime_state)
+        if menu_choice.matches(constants.MENU_ADD):
+            menu_execution.add(runtime_state)
             return True
 
-        if choice == c.MENU_LIST:
-            self.menu_execution.show_list(runtime_state)
+        if menu_choice.matches(constants.MENU_LIST):
+            menu_execution.show_list(runtime_state)
             return True
 
-        if has_delete and choice == c.MENU_DELETE:
-            self.menu_execution.delete(runtime_state)
+        if has_delete and menu_choice.matches(constants.MENU_DELETE):
+            menu_execution.delete(runtime_state)
             return True
 
-        if self._is_score_choice(choice, has_delete):
-            self.menu_execution.show_best_score(console_interface, runtime_state)
+        if menu_choice.matches_score(has_delete):
+            menu_execution.show_best_score(console_interface, runtime_state)
             return True
 
-        self.game_shutdown_service.handle_normal_exit(runtime_state)
+        game_shutdown_service.handle_normal_exit(runtime_state)
         return False
 
     def persist(self, runtime_state: GameRuntimeState) -> None:
-        self.menu_execution.persist(runtime_state)
+        menu_execution = self.menu_execution
+        menu_execution.persist(runtime_state)
 
     def handle_interrupted_session(
         self,
         runtime_state: GameRuntimeState,
         result,
     ) -> None:
-        self.game_shutdown_service.handle_interrupted_session(runtime_state, result)
+        game_shutdown_service = self.game_shutdown_service
+        game_shutdown_service.handle_interrupted_session(runtime_state, result)
 
     def handle_interrupted_program(self, runtime_state: GameRuntimeState) -> None:
-        self.game_shutdown_service.handle_interrupted_program(runtime_state)
-
-    def _is_score_choice(self, choice: int, has_delete: bool) -> bool:
-        if has_delete:
-            return choice == c.MENU_SCORE
-        return choice == c.MENU_DELETE
+        game_shutdown_service = self.game_shutdown_service
+        game_shutdown_service.handle_interrupted_program(runtime_state)

@@ -1,7 +1,13 @@
 from typing import Optional
 
-import app.config.constants as c
+import app.config.constants as constants
 from app.model.quiz import Quiz
+from app.service.quiz_metrics import (
+    CorrectAnswerCount,
+    DisplayIndex,
+    HintUsageCount,
+    QuestionCount,
+)
 from app.service.quiz_partial_result_builder import QuizPartialResultBuilder
 from app.service.quiz_question_round_service import (
     QuizQuestionRoundInterrupted,
@@ -23,25 +29,30 @@ class QuizRoundCoordinator:
         self,
         selected_quizzes: list[Quiz],
     ) -> Optional[QuizSessionResult]:
-        correct_count = c.INITIAL_CORRECT_COUNT
-        hint_used_count = c.INITIAL_HINT_USED_COUNT
-        answered_question_count = c.INITIAL_CORRECT_COUNT
+        correct_count = CorrectAnswerCount(constants.INITIAL_CORRECT_COUNT)
+        hint_used_count = HintUsageCount(constants.INITIAL_HINT_USED_COUNT)
+        answered_question_count = QuestionCount(constants.INITIAL_CORRECT_COUNT)
+        total_questions = QuestionCount(len(selected_quizzes))
 
         try:
-            for index, quiz in enumerate(selected_quizzes, start=c.DISPLAY_INDEX_START):
+            for raw_index, quiz in enumerate(
+                selected_quizzes,
+                start=constants.DISPLAY_INDEX_START,
+            ):
+                display_index = DisplayIndex(raw_index)
                 round_result = self.question_round_service.play_round(
                     quiz,
-                    index,
-                    len(selected_quizzes),
+                    display_index,
+                    total_questions,
                 )
-                correct_count += round_result.correct_count
-                hint_used_count += round_result.hint_used_count
-                answered_question_count += c.DISPLAY_INDEX_START
+                correct_count = correct_count.add(round_result.correct_count)
+                hint_used_count = hint_used_count.add(round_result.hint_used_count)
+                answered_question_count = answered_question_count.incremented()
         except QuizQuestionRoundInterrupted as interrupted:
-            hint_used_count += interrupted.hint_used_count
+            hint_used_count = hint_used_count.add(interrupted.hint_used_count)
             raise QuizSessionInterrupted(
                 self.partial_result_builder.build_interrupted_result(
-                    len(selected_quizzes),
+                    total_questions,
                     correct_count,
                     hint_used_count,
                     answered_question_count,
@@ -49,7 +60,7 @@ class QuizRoundCoordinator:
             ) from interrupted
 
         return self.partial_result_builder.build_completed_result(
-            len(selected_quizzes),
+            total_questions,
             correct_count,
             hint_used_count,
         )

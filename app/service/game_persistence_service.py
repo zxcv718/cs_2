@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-import app.config.constants as c
+import app.config.constants as constants
 from app.model.quiz import Quiz
 from app.service.game_runtime_state import GameRuntimeState
 from app.service.game_state_service import GameStateService
@@ -17,10 +17,12 @@ class GamePersistenceService:
         self.console_interface = console_interface
 
     def save_runtime_state(self, runtime_state: GameRuntimeState) -> None:
+        state_service = self.state_service
+        console_interface = self.console_interface
         try:
-            runtime_state.save_with(self.state_service)
+            runtime_state.save_with(state_service)
         except OSError:
-            self.console_interface.show_error(c.ERROR_STATE_SAVE)
+            console_interface.show_error(constants.ERROR_STATE_SAVE)
             return
 
     def save_state_values(
@@ -29,7 +31,9 @@ class GamePersistenceService:
         best_score: Optional[int],
         history: list[dict[str, Any]],
     ) -> None:
+        state_service = self.state_service
+        console_interface = self.console_interface
         try:
-            self.state_service.save_state(quizzes, best_score, history)
+            state_service.save_state(quizzes, best_score, history)
         except OSError:
-            self.console_interface.show_error(c.ERROR_STATE_SAVE)
+            console_interface.show_error(constants.ERROR_STATE_SAVE)

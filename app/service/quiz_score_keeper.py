@@ -2,14 +2,15 @@ from dataclasses import dataclass
 from typing import Optional
 
 from app.service.best_score_service import BestScoreService
+from app.service.quiz_metrics import ScoreValue
 from app.service.quiz_scoring_service import QuizScoringService
 from app.service.quiz_session_models import QuizSessionResult
 
 
 @dataclass(frozen=True)
 class ScoreRecord:
-    score: int
-    best_score: Optional[int]
+    score: ScoreValue
+    best_score: Optional[ScoreValue]
     is_new_record: bool
 
 
@@ -24,7 +25,7 @@ class QuizScoreKeeper:
 
     def keep(
         self,
-        best_score: Optional[int],
+        best_score: Optional[ScoreValue],
         result: QuizSessionResult,
     ) -> ScoreRecord:
         score = self.scoring_service.calculate_score(

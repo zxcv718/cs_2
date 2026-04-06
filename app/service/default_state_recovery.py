@@ -1,6 +1,6 @@
 from typing import Any, Callable
 
-import app.config.constants as c
+import app.config.constants as constants
 from app.service.default_game_state_factory import DefaultGameStateFactory
 from app.service.game_persistence_service import GamePersistenceService
 
@@ -15,13 +15,25 @@ class DefaultStateRecovery:
         self.persistence_service = persistence_service
 
     def recover_for_missing_file(self, notify: Callable[[str], None]) -> dict[str, Any]:
-        return self._recover(notify, c.MESSAGE_STATE_FILE_MISSING, should_save=True)
+        return self._recover(
+            notify,
+            constants.MESSAGE_STATE_FILE_MISSING,
+            should_save=True,
+        )
 
     def recover_for_invalid_state(self, notify: Callable[[str], None]) -> dict[str, Any]:
-        return self._recover(notify, c.ERROR_STATE_CORRUPTED, should_save=True)
+        return self._recover(
+            notify,
+            constants.ERROR_STATE_CORRUPTED,
+            should_save=True,
+        )
 
     def recover_for_read_error(self, notify: Callable[[str], None]) -> dict[str, Any]:
-        return self._recover(notify, c.ERROR_STATE_READ, should_save=False)
+        return self._recover(
+            notify,
+            constants.ERROR_STATE_READ,
+            should_save=False,
+        )
 
     def _recover(
         self,
@@ -34,8 +46,8 @@ class DefaultStateRecovery:
         if not should_save:
             return state
         self.persistence_service.save_state_values(
-            state[c.STATE_KEY_QUIZZES],
-            state[c.STATE_KEY_BEST_SCORE],
-            state[c.STATE_KEY_HISTORY],
+            state[constants.STATE_KEY_QUIZZES],
+            state[constants.STATE_KEY_BEST_SCORE],
+            state[constants.STATE_KEY_HISTORY],
         )
         return state

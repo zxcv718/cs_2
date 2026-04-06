@@ -3,7 +3,7 @@ from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, Optional, Union
 
-import app.config.constants as c
+import app.config.constants as constants
 from app.model.quiz import Quiz
 from app.repository.state_payload_mapper import StatePayloadMapper
 
@@ -22,12 +22,15 @@ class StateRepository:
     # 파일에서 게임 상태를 읽어 파이썬 객체로 바꿉니다.
     def load_state(self) -> dict[str, Any]:
         try:
-            with self.state_file.open(c.FILE_READ_MODE, encoding=c.STATE_ENCODING) as file:
+            with self.state_file.open(
+                constants.FILE_READ_MODE,
+                encoding=constants.STATE_ENCODING,
+            ) as file:
                 data = json.load(file)
         except FileNotFoundError:
             raise
         except JSONDecodeError as exc:
-            raise ValueError(c.ERROR_INVALID_JSON_STATE) from exc
+            raise ValueError(constants.ERROR_INVALID_JSON_STATE) from exc
         except OSError:
             raise
 
@@ -37,7 +40,7 @@ class StateRepository:
         try:
             return self.payload_mapper.from_payload(data)
         except ValueError as exc:
-            raise ValueError(c.ERROR_INVALID_STATE_SCHEMA) from exc
+            raise ValueError(constants.ERROR_INVALID_STATE_SCHEMA) from exc
 
     # 현재 게임 상태를 JSON 파일로 저장합니다.
     def save_state(
@@ -51,10 +54,13 @@ class StateRepository:
         # 폴더가 없으면 먼저 만들고 파일을 저장합니다.
         # dump는 파이썬 객체를 json형식으로 파일에 바로 저장하는 함수
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
-        with self.state_file.open(c.FILE_WRITE_MODE, encoding=c.STATE_ENCODING) as file:
+        with self.state_file.open(
+            constants.FILE_WRITE_MODE,
+            encoding=constants.STATE_ENCODING,
+        ) as file:
             json.dump(
                 payload,
                 file,
-                ensure_ascii=c.STATE_JSON_ENSURE_ASCII,
-                indent=c.STATE_JSON_INDENT,
+                ensure_ascii=constants.STATE_JSON_ENSURE_ASCII,
+                indent=constants.STATE_JSON_INDENT,
             )

@@ -2,14 +2,15 @@ from dataclasses import dataclass
 
 from app.service.game_runtime_state import GameRuntimeState
 from app.service.quiz_history_service import QuizHistoryService
+from app.service.quiz_metrics import ScoreValue
 from app.service.quiz_score_keeper import QuizScoreKeeper
 from app.service.quiz_session_models import QuizSessionResult
 
 
 @dataclass(frozen=True)
 class RecordedQuizResult:
-    score: int
-    best_score: int | None
+    score: ScoreValue
+    best_score: ScoreValue | None
     is_new_record: bool
 
 

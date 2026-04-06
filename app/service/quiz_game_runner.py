@@ -13,16 +13,21 @@ class QuizGameRunner:
         self.quiz_game_execution = quiz_game_execution
 
     def initialize_state(self, runtime_state: GameRuntimeState) -> None:
-        self.quiz_game_execution.initialize_state(
+        quiz_game_execution = self.quiz_game_execution
+        console_interface = self.console_interface
+        quiz_game_execution.initialize_state(
             runtime_state,
-            self.console_interface,
+            console_interface,
         )
 
     def persist_state(self, runtime_state: GameRuntimeState) -> None:
-        self.quiz_game_execution.persist_state(runtime_state)
+        quiz_game_execution = self.quiz_game_execution
+        quiz_game_execution.persist_state(runtime_state)
 
     def run(self, runtime_state: GameRuntimeState) -> None:
-        self.quiz_game_execution.run(
+        quiz_game_execution = self.quiz_game_execution
+        console_interface = self.console_interface
+        quiz_game_execution.run(
             runtime_state,
-            self.console_interface,
+            console_interface,
         )

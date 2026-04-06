@@ -1,19 +1,25 @@
 from dataclasses import dataclass
 from typing import Optional
 
-import app.config.constants as c
+import app.config.constants as constants
 from app.model.quiz import Quiz
+from app.service.quiz_metrics import (
+    CorrectAnswerCount,
+    DisplayIndex,
+    HintUsageCount,
+    QuestionCount,
+)
 from app.ui.console_ui import ConsoleUI
 
 
 @dataclass(frozen=True)
 class QuizQuestionRoundResult:
-    correct_count: int
-    hint_used_count: int
+    correct_count: CorrectAnswerCount
+    hint_used_count: HintUsageCount
 
 
 class QuizQuestionRoundInterrupted(Exception):
-    def __init__(self, hint_used_count: int) -> None:
+    def __init__(self, hint_used_count: HintUsageCount) -> None:
         super().__init__("quiz question round interrupted")
         self.hint_used_count = hint_used_count
 
@@ -21,7 +27,7 @@ class QuizQuestionRoundInterrupted(Exception):
 @dataclass
 class QuizQuestionRoundState:
     used_hint_for_question: bool = False
-    hint_used_count: int = c.INITIAL_HINT_USED_COUNT
+    hint_used_count: HintUsageCount = HintUsageCount(constants.INITIAL_HINT_USED_COUNT)
 
 
 class QuizQuestionRoundService:
@@ -31,8 +37,8 @@ class QuizQuestionRoundService:
     def play_round(
         self,
         quiz: Quiz,
-        index: int,
-        total_questions: int,
+        index: DisplayIndex,
+        total_questions: QuestionCount,
     ) -> QuizQuestionRoundResult:
         self.console_interface.show_question(quiz, index, total_questions)
         round_state = QuizQuestionRoundState()
@@ -58,17 +64,17 @@ class QuizQuestionRoundService:
         quiz: Quiz,
         round_state: QuizQuestionRoundState,
     ) -> Optional[QuizQuestionRoundResult]:
-        user_input = self.console_interface.get_answer_or_hint(
-            c.PROMPT_ANSWER,
-            c.MIN_ANSWER,
-            c.MAX_ANSWER,
+        user_input = self.console_interface.request_answer_or_hint(
+            constants.PROMPT_ANSWER,
+            constants.MIN_ANSWER,
+            constants.MAX_ANSWER,
         )
 
-        if user_input == c.HINT_COMMAND_VALUE:
+        if user_input == constants.HINT_COMMAND_VALUE:
             return self._result_for_hint_request(quiz, round_state)
 
         if not isinstance(user_input, int):
-            self.console_interface.show_error(c.ERROR_ANSWER_OR_HINT_INPUT)
+            self.console_interface.show_error(constants.ERROR_ANSWER_OR_HINT_INPUT)
             return None
 
         if quiz.matches(user_input):
@@ -82,27 +88,27 @@ class QuizQuestionRoundService:
         round_state: QuizQuestionRoundState,
     ) -> Optional[QuizQuestionRoundResult]:
         if not quiz.can_offer_hint():
-            self.console_interface.show_error(c.ERROR_NO_HINT_FOR_QUESTION)
+            self.console_interface.show_error(constants.ERROR_NO_HINT_FOR_QUESTION)
             return None
 
         if round_state.used_hint_for_question:
-            self.console_interface.show_error(c.ERROR_HINT_ALREADY_USED)
+            self.console_interface.show_error(constants.ERROR_HINT_ALREADY_USED)
             return None
 
         self.console_interface.show_message(
-            c.MESSAGE_HINT_TEMPLATE.format(hint=quiz.render_hint_message())
+            constants.MESSAGE_HINT_TEMPLATE.format(hint=quiz.render_hint_message())
         )
         round_state.used_hint_for_question = True
-        round_state.hint_used_count += 1
+        round_state.hint_used_count = round_state.hint_used_count.incremented()
         return None
 
     def _correct_result(
         self,
         round_state: QuizQuestionRoundState,
     ) -> QuizQuestionRoundResult:
-        self.console_interface.show_message(c.MESSAGE_CORRECT_ANSWER)
+        self.console_interface.show_message(constants.MESSAGE_CORRECT_ANSWER)
         return QuizQuestionRoundResult(
-            correct_count=c.DISPLAY_INDEX_START,
+            correct_count=CorrectAnswerCount(constants.DISPLAY_INDEX_START),
             hint_used_count=round_state.hint_used_count,
         )
 
@@ -113,6 +119,6 @@ class QuizQuestionRoundService:
     ) -> QuizQuestionRoundResult:
         self.console_interface.show_error(quiz.render_wrong_answer_message())
         return QuizQuestionRoundResult(
-            correct_count=c.INITIAL_CORRECT_COUNT,
+            correct_count=CorrectAnswerCount(constants.INITIAL_CORRECT_COUNT),
             hint_used_count=round_state.hint_used_count,
         )

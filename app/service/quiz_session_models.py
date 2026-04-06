@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 from typing import Optional
 
+from app.service.quiz_metrics import CorrectAnswerCount, HintUsageCount, QuestionCount
+
 
 @dataclass(frozen=True)
 class QuizSessionResult:
-    total_questions: int
-    correct_count: int
-    hint_used_count: int
+    total_questions: QuestionCount
+    correct_count: CorrectAnswerCount
+    hint_used_count: HintUsageCount
 
 
 class QuizSessionInterrupted(Exception):

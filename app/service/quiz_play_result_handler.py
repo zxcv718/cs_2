@@ -1,4 +1,4 @@
-import app.config.constants as c
+import app.config.constants as constants
 from app.service.game_persistence_service import GamePersistenceService
 from app.service.game_runtime_state import GameRuntimeState
 from app.service.quiz_result_recorder import QuizResultRecorder
@@ -21,13 +21,15 @@ class QuizPlayResultHandler:
         runtime_state: GameRuntimeState,
         result: QuizSessionResult,
     ) -> None:
-        recorded_result = self.result_recorder.record(runtime_state, result)
-        self.persistence_service.save_runtime_state(runtime_state)
+        result_recorder = self.result_recorder
+        persistence_service = self.persistence_service
+        recorded_result = result_recorder.record(runtime_state, result)
+        persistence_service.save_runtime_state(runtime_state)
         console_interface.show_result(
-            result.correct_count,
-            recorded_result.score,
-            result.total_questions,
-            result.hint_used_count,
+            int(result.correct_count),
+            int(recorded_result.score),
+            int(result.total_questions),
+            int(result.hint_used_count),
         )
         if recorded_result.is_new_record:
-            console_interface.show_message(c.MESSAGE_BEST_SCORE_UPDATED)
+            console_interface.show_message(constants.MESSAGE_BEST_SCORE_UPDATED)
