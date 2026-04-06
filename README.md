@@ -14,6 +14,8 @@ Python 콘솔 환경에서 동작하는 퀴즈 게임입니다.
 
 - 콘솔 메뉴로 퀴즈 풀기, 추가, 목록 확인, 삭제, 최고 점수 확인
 - `state.json` 기반 퀴즈/최고 점수/플레이 기록 유지
+- 손상된 `state.json`을 가능한 경우 `.bak`로 보존한 뒤 기본 상태로 복구
+- 임시 파일 저장 후 교체하는 방식으로 상태 파일을 atomic 하게 저장
 - 퀴즈 진행 중 인터럽트 발생 시 부분 결과를 가능한 범위에서 저장
 - `pytest`, `unittest`, `pyright` 기준 green 유지
 
@@ -152,6 +154,7 @@ app/
 #### `app/application/state`
 
 - 런타임 상태, 부트스트랩, 기본 상태 복구, 저장, 종료
+- 손상된 상태 파일 백업 후 기본 상태 복구, 인터럽트 종료 저장
 - `state.json`과 맞닿는 애플리케이션 상태 흐름
 
 #### `app/application` 루트
@@ -178,7 +181,7 @@ app/
 ### `app/repository`
 
 - 파일 입출력과 payload 변환 경계
-- `StateRepository`: `state.json` 파일 읽기/쓰기
+- `StateRepository`: `state.json` 파일 읽기/쓰기, atomic 저장, 손상 파일 백업 지원
 - `StatePayloadMapper`: 전체 상태 스키마 검증/복원
 - `QuizPayloadMapper`: `Quiz` <-> payload 변환
 
@@ -205,6 +208,7 @@ app/
   - 퀴즈 목록
   - 최고 점수
   - 플레이 히스토리
+- 손상된 상태 파일을 읽으면 가능한 경우 `state.json.bak`로 보존 후 기본 상태로 복구
 
 예시 스키마:
 
