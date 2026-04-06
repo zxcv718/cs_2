@@ -17,7 +17,7 @@ Python 콘솔 환경에서 동작하는 퀴즈 게임입니다.
 - 손상된 `state.json`을 가능한 경우 `.bak`로 보존한 뒤 기본 상태로 복구
 - 임시 파일 저장 후 교체하는 방식으로 상태 파일을 atomic 하게 저장
 - 퀴즈 진행 중 인터럽트 발생 시 부분 결과를 가능한 범위에서 저장
-- `pytest`, `unittest`, `pyright` 기준 green 유지
+- `pytest`, `unittest`, `pyright`와 구조 규칙 테스트 기준 green 유지
 
 ## 실행
 
@@ -64,13 +64,13 @@ app/
 │   ├── menu_execution.py
 │   ├── quiz_game.py
 │   ├── quiz_game_execution.py
+│   ├── quiz_game_factory.py
 │   ├── quiz_game_runner.py
 │   ├── catalog/
 │   │   ├── __init__.py
 │   │   ├── quiz_catalog_creation_service.py
 │   │   ├── quiz_catalog_deletion_service.py
-│   │   ├── quiz_catalog_listing_service.py
-│   │   └── quiz_catalog_mutation_workflow.py
+│   │   └── quiz_catalog_listing_service.py
 │   ├── play/
 │   │   ├── __init__.py
 │   │   ├── best_score_service.py
@@ -93,12 +93,13 @@ app/
 │       ├── game_bootstrap_service.py
 │       ├── game_exit_persistence.py
 │       ├── game_history.py
-│       ├── game_lifecycle.py
 │       ├── game_persistence_service.py
 │       ├── game_record_book.py
 │       ├── game_runtime_state.py
 │       ├── game_shutdown_service.py
-│       └── game_state_service.py
+│       ├── game_snapshot.py
+│       ├── game_state_service.py
+│       └── quiz_history_entry.py
 ├── config/
 │   ├── __init__.py
 │   └── constants.py
@@ -112,7 +113,8 @@ app/
 │   ├── quiz.py
 │   ├── quiz_catalog.py
 │   ├── quiz_components.py
-│   └── quiz_factory.py
+│   ├── quiz_factory.py
+│   └── quiz_selection.py
 ├── presentation/
 │   ├── __init__.py
 │   ├── best_score_display_service.py
@@ -143,8 +145,8 @@ app/
 
 #### `app/application/catalog`
 
-- 퀴즈 추가, 삭제, 목록 보기 흐름
-- 카탈로그 mutation과 listing 책임 분리
+- 퀴즈 추가, 삭제, 목록 보기 유스케이스
+- add/delete/list를 별도 action에서 조합할 수 있게 분리
 
 #### `app/application/play`
 
@@ -153,15 +155,16 @@ app/
 
 #### `app/application/state`
 
-- 런타임 상태, 부트스트랩, 기본 상태 복구, 저장, 종료
+- 런타임 상태, snapshot, history entry, 기본 상태 복구, 저장, 종료
 - 손상된 상태 파일 백업 후 기본 상태 복구, 인터럽트 종료 저장
 - `state.json`과 맞닿는 애플리케이션 상태 흐름
 
 #### `app/application` 루트
 
-- `QuizGame`: composition root
+- `QuizGame`: 런타임 상태와 runner를 감싸는 facade
+- `QuizGameFactory`: object graph 조립 전담 composition root
 - `QuizGameExecution`, `QuizGameRunner`: 실행 루프와 진입점 분리
-- `MenuActionDispatcher`, `MenuExecution`: 메뉴 선택과 실제 동작 위임 분리
+- `MenuActionDispatcher`, `MenuActions`: 메뉴 선택과 action dispatch 분리
 
 ### `app/model`
 
@@ -170,6 +173,7 @@ app/
 - `QuizPrompt`, `QuizSolution`, `QuestionText`, `ChoiceSet`, `AnswerNumber`, `HintText`
   : 퀴즈 입력 규칙과 값 의미를 가진 값 객체
 - `QuizCatalog`: 퀴즈 컬렉션 전용 일급 컬렉션
+- `QuizSelection`: 플레이 대상으로 뽑힌 퀴즈 집합 전용 일급 컬렉션
 - `QuizFactory`: 검증된 값 객체를 조합해 `Quiz` 생성
 
 ### `app/presentation`
@@ -181,8 +185,8 @@ app/
 ### `app/repository`
 
 - 파일 입출력과 payload 변환 경계
-- `StateRepository`: `state.json` 파일 읽기/쓰기, atomic 저장, 손상 파일 백업 지원
-- `StatePayloadMapper`: 전체 상태 스키마 검증/복원
+- `StateRepository`: `GameSnapshot` <-> `state.json` 읽기/쓰기, atomic 저장, 손상 파일 백업 지원
+- `StatePayloadMapper`: `GameSnapshot` 기준 전체 상태 스키마 검증/복원
 - `QuizPayloadMapper`: `Quiz` <-> payload 변환
 
 ### `app/service`
@@ -199,6 +203,8 @@ app/
 - 패키지 구조도 실제 책임 경계를 반영
 - 점수/질문 수/표시 인덱스/메뉴 선택/타임스탬프 같은 값을 wrapper 객체로 승격
 - 직접 리스트 조작 대신 일급 컬렉션 사용
+- runtime state와 history를 raw `dict` 대신 snapshot/value object로 다룸
+- 구조 규칙을 테스트로 고정
 - 실행 흐름, 저장, 복구, 점수 정책, 콘솔 입출력, 표현 책임 분리
 
 ## 데이터 파일
