@@ -61,6 +61,12 @@ class AnswerNumber:
             )
         return cls(answer)
 
+    def __int__(self) -> int:
+        return self.value
+
+    def __index__(self) -> int:
+        return self.value
+
 
 @dataclass(frozen=True)
 class HintText:
@@ -88,30 +94,27 @@ class QuizPrompt:
     choice_set: ChoiceSet
 
     def render_question_line(self) -> str:
-        return self.question_text.value
+        question_text = self.question_text
+        return question_text.value
 
     def render_choice_lines(self) -> tuple[str, ...]:
-        return self.choice_set.values
+        choice_set = self.choice_set
+        return choice_set.values
 
     def render_choice_line_for(self, answer_number: "AnswerNumber") -> str:
-        index = answer_number.value - constants.DISPLAY_INDEX_START
-        return self.choice_set.values[index]
+        answer = int(answer_number)
+        index = answer - constants.DISPLAY_INDEX_START
+        choice_lines = self.render_choice_lines()
+        return choice_lines[index]
 
     def render_listing_lines(self, display_index: DisplayIndex) -> tuple[str, ...]:
-        listing_header = constants.QUIZ_LIST_ITEM_TEMPLATE.format(
+        listing_template = constants.QUIZ_LIST_ITEM_TEMPLATE
+        question_line = self.render_question_line()
+        listing_header = listing_template.format(
             index=int(display_index),
-            question=self.render_question_line(),
+            question=question_line,
         )
-        choice_lines = tuple(
-            constants.QUIZ_LIST_CHOICE_TEMPLATE.format(
-                choice_index=choice_index,
-                choice=choice,
-            )
-            for choice_index, choice in enumerate(
-                self.render_choice_lines(),
-                start=constants.DISPLAY_INDEX_START,
-            )
-        )
+        choice_lines = self._listing_choice_lines()
         return (listing_header, *choice_lines)
 
     def render_question_lines(
@@ -119,13 +122,27 @@ class QuizPrompt:
         display_index: DisplayIndex,
         total_questions: QuestionCount,
     ) -> tuple[str, ...]:
-        question_header = constants.QUESTION_HEADER_TEMPLATE.format(
+        header_template = constants.QUESTION_HEADER_TEMPLATE
+        question_line = self.render_question_line()
+        question_header = header_template.format(
             index=int(display_index),
             total=int(total_questions),
-            question=self.render_question_line(),
+            question=question_line,
         )
-        choice_lines = tuple(
-            constants.QUESTION_CHOICE_TEMPLATE.format(
+        choice_lines = self._question_choice_lines()
+        return (question_header, *choice_lines)
+
+    def _listing_choice_lines(self) -> tuple[str, ...]:
+        choice_template = constants.QUIZ_LIST_CHOICE_TEMPLATE
+        return self._choice_lines(choice_template)
+
+    def _question_choice_lines(self) -> tuple[str, ...]:
+        choice_template = constants.QUESTION_CHOICE_TEMPLATE
+        return self._choice_lines(choice_template)
+
+    def _choice_lines(self, choice_template: str) -> tuple[str, ...]:
+        return tuple(
+            choice_template.format(
                 choice_index=choice_index,
                 choice=choice,
             )
@@ -134,7 +151,6 @@ class QuizPrompt:
                 start=constants.DISPLAY_INDEX_START,
             )
         )
-        return (question_header, *choice_lines)
 
 
 @dataclass(frozen=True)
@@ -143,7 +159,8 @@ class QuizSolution:
     hint_text: Optional[HintText] = None
 
     def matches(self, user_answer: int) -> bool:
-        return self.answer_number.value == user_answer
+        answer_number = self.answer_number
+        return int(answer_number) == user_answer
 
     def can_offer_hint(self) -> bool:
         return self.hint_text is not None
@@ -151,10 +168,13 @@ class QuizSolution:
     def render_hint_line(self) -> str:
         if self.hint_text is None:
             return constants.EMPTY_TEXT
-        return self.hint_text.render()
+        hint_text = self.hint_text
+        return hint_text.render()
 
     def render_wrong_answer_message(self, prompt: QuizPrompt) -> str:
+        answer_number = self.answer_number
+        correct_choice_line = prompt.render_choice_line_for(answer_number)
         return constants.ERROR_WRONG_ANSWER_TEMPLATE.format(
-            answer=self.answer_number.value,
-            correct_text=prompt.render_choice_line_for(self.answer_number),
+            answer=int(answer_number),
+            correct_text=correct_choice_line,
         )

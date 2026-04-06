@@ -159,10 +159,12 @@ class ConsoleUI:
 
     # 최고 점수가 없으면 안내 문구를 보여줍니다.
     def display_best_score(self, best_score: Optional[int]) -> None:
+        show_message = self.show_message
         if best_score is None:
-            self.show_message(constants.MESSAGE_NO_BEST_SCORE)
+            show_message(constants.MESSAGE_NO_BEST_SCORE)
             return
-        self.show_message(constants.BEST_SCORE_TEMPLATE.format(best_score=best_score))
+        template = constants.BEST_SCORE_TEMPLATE
+        show_message(template.format(best_score=best_score))
 
     # 현재 출제 중인 문제와 선택지를 출력합니다.
     def show_question(

@@ -30,7 +30,7 @@ class GameRuntimeState:
     ) -> None:
         self.quiz_catalog = QuizCatalog.from_items(quizzes)
         history_entries = GameHistory.from_entries(history)
-        wrapped_best_score = None if best_score is None else ScoreValue(best_score)
+        wrapped_best_score = self._wrapped_score(best_score)
         record_book = GameRecordBook(wrapped_best_score, history_entries)
         self.game_lifecycle = GameLifecycle(record_book, True)
 
@@ -68,6 +68,11 @@ class GameRuntimeState:
         console_interface.display_best_score(
             _score_value_or_none(self.game_lifecycle.record_book.best_score)
         )
+
+    def _wrapped_score(self, best_score: int | None) -> ScoreValue | None:
+        if best_score is None:
+            return None
+        return ScoreValue(best_score)
 
 
 def _score_value_or_none(score_value: ScoreValue | None) -> int | None:

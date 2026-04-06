@@ -10,21 +10,26 @@ class Quiz:
         self.solution = solution
 
     def matches(self, user_answer: int) -> bool:
-        return self.solution.matches(user_answer)
+        solution = self.solution
+        return solution.matches(user_answer)
 
     def can_offer_hint(self) -> bool:
-        return self.solution.can_offer_hint()
+        solution = self.solution
+        return solution.can_offer_hint()
 
     def optional_hint_message(self) -> str | None:
         if not self.can_offer_hint():
             return None
-        return self.solution.render_hint_line()
+        solution = self.solution
+        return solution.render_hint_line()
 
     def payload_item(self) -> dict[str, object]:
+        prompt = self.prompt
+        solution = self.solution
         item: dict[str, object] = {
-            constants.QUIZ_FIELD_QUESTION: self.prompt.render_question_line(),
-            constants.QUIZ_FIELD_CHOICES: list(self.prompt.render_choice_lines()),
-            constants.QUIZ_FIELD_ANSWER: self.solution.answer_number.value,
+            constants.QUIZ_FIELD_QUESTION: prompt.render_question_line(),
+            constants.QUIZ_FIELD_CHOICES: list(prompt.render_choice_lines()),
+            constants.QUIZ_FIELD_ANSWER: int(solution.answer_number),
         }
         hint_line = self.optional_hint_message()
         if hint_line is None:
@@ -33,17 +38,22 @@ class Quiz:
         return item
 
     def render_listing_lines(self, display_index: DisplayIndex) -> tuple[str, ...]:
-        return self.prompt.render_listing_lines(display_index)
+        prompt = self.prompt
+        return prompt.render_listing_lines(display_index)
 
     def render_question_lines(
         self,
         display_index: DisplayIndex,
         total_questions: QuestionCount,
     ) -> tuple[str, ...]:
-        return self.prompt.render_question_lines(display_index, total_questions)
+        prompt = self.prompt
+        return prompt.render_question_lines(display_index, total_questions)
 
     def render_hint_message(self) -> str:
-        return self.solution.render_hint_line()
+        solution = self.solution
+        return solution.render_hint_line()
 
     def render_wrong_answer_message(self) -> str:
-        return self.solution.render_wrong_answer_message(self.prompt)
+        prompt = self.prompt
+        solution = self.solution
+        return solution.render_wrong_answer_message(prompt)
