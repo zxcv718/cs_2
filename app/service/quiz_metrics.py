@@ -12,12 +12,13 @@ def _validate_non_negative(value: int) -> int:
     return value
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(order=True)
 class QuestionCount:
     value: int
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "value", _validate_non_negative(self.value))
+        raw_value = self.value
+        self.value = _validate_non_negative(raw_value)
 
     def __int__(self) -> int:
         return self.value
@@ -26,15 +27,18 @@ class QuestionCount:
         return self.value
 
     def incremented(self) -> "QuestionCount":
-        return QuestionCount(self.value + constants.DISPLAY_INDEX_START)
+        current_value = self.value
+        increment = constants.DISPLAY_INDEX_START
+        return QuestionCount(current_value + increment)
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(order=True)
 class CorrectAnswerCount:
     value: int
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "value", _validate_non_negative(self.value))
+        raw_value = self.value
+        self.value = _validate_non_negative(raw_value)
 
     def __int__(self) -> int:
         return self.value
@@ -43,15 +47,18 @@ class CorrectAnswerCount:
         return self.value
 
     def add(self, correct_answer_count: "CorrectAnswerCount") -> "CorrectAnswerCount":
-        return CorrectAnswerCount(self.value + correct_answer_count.value)
+        current_value = self.value
+        added_value = correct_answer_count.value
+        return CorrectAnswerCount(current_value + added_value)
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(order=True)
 class HintUsageCount:
     value: int
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "value", _validate_non_negative(self.value))
+        raw_value = self.value
+        self.value = _validate_non_negative(raw_value)
 
     def __int__(self) -> int:
         return self.value
@@ -60,18 +67,23 @@ class HintUsageCount:
         return self.value
 
     def add(self, hint_usage_count: "HintUsageCount") -> "HintUsageCount":
-        return HintUsageCount(self.value + hint_usage_count.value)
+        current_value = self.value
+        added_value = hint_usage_count.value
+        return HintUsageCount(current_value + added_value)
 
     def incremented(self) -> "HintUsageCount":
-        return HintUsageCount(self.value + constants.DISPLAY_INDEX_START)
+        current_value = self.value
+        increment = constants.DISPLAY_INDEX_START
+        return HintUsageCount(current_value + increment)
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(order=True)
 class ScoreValue:
     value: int
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "value", _validate_non_negative(self.value))
+        raw_value = self.value
+        self.value = _validate_non_negative(raw_value)
 
     def __int__(self) -> int:
         return self.value
@@ -80,12 +92,13 @@ class ScoreValue:
         return self.value
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(order=True)
 class MenuChoice:
     value: int
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "value", _validate_non_negative(self.value))
+        raw_value = self.value
+        self.value = _validate_non_negative(raw_value)
 
     def __int__(self) -> int:
         return self.value
@@ -95,17 +108,21 @@ class MenuChoice:
 
     def matches_score(self, has_delete: bool) -> bool:
         if has_delete:
-            return self.matches(constants.MENU_SCORE)
-        return self.matches(constants.MENU_DELETE)
+            menu_score = constants.MENU_SCORE
+            return self.matches(menu_score)
+        menu_delete = constants.MENU_DELETE
+        return self.matches(menu_delete)
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(order=True)
 class DisplayIndex:
     value: int
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "value", _validate_non_negative(self.value))
-        if self.value < constants.DISPLAY_INDEX_START:
+        raw_value = self.value
+        self.value = _validate_non_negative(raw_value)
+        display_index_start = constants.DISPLAY_INDEX_START
+        if self.value < display_index_start:
             raise ValueError("display index must start from one")
 
     def __int__(self) -> int:
@@ -115,17 +132,20 @@ class DisplayIndex:
         return self.value
 
     def to_storage_index(self) -> int:
-        return self.value - constants.DISPLAY_INDEX_START
+        current_value = self.value
+        display_index_start = constants.DISPLAY_INDEX_START
+        return current_value - display_index_start
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(order=True)
 class PlayedAt:
     value: str
 
     @classmethod
     def now(cls) -> "PlayedAt":
         played_at = datetime.now()
-        played_at_text = played_at.isoformat(timespec=constants.DATETIME_TIMESPEC)
+        date_time_timespec = constants.DATETIME_TIMESPEC
+        played_at_text = played_at.isoformat(timespec=date_time_timespec)
         return cls(played_at_text)
 
     @classmethod
