@@ -1,5 +1,5 @@
 from app.config.constants import STATE_FILE
-from app.application.quiz_game import QuizGame
+from app.application.quiz_game_factory import QuizGameFactory
 from app.console.interface import ConsoleInterface
 from app.repository.state_repository import StateRepository
 
@@ -11,7 +11,7 @@ def main() -> None:
     # state.json 파일을 읽고 저장하는 객체입니다.
     state_repository = StateRepository(STATE_FILE)
     # 게임 전체 흐름을 조율하는 객체입니다.
-    game = QuizGame(console_interface, state_repository)
+    game = QuizGameFactory().create(console_interface, state_repository)
     game.run()
 
 

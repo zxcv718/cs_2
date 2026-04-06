@@ -106,12 +106,17 @@ class MenuChoice:
     def matches(self, menu_value: int) -> bool:
         return self.value == menu_value
 
-    def matches_score(self, has_delete: bool) -> bool:
-        if has_delete:
+    def matches_score(self, delete_menu_availability: "DeleteMenuAvailability") -> bool:
+        if delete_menu_availability.shows_delete_option():
             menu_score = constants.MENU_SCORE
             return self.matches(menu_score)
         menu_delete = constants.MENU_DELETE
         return self.matches(menu_delete)
+
+    def matches_delete(self, delete_menu_availability: "DeleteMenuAvailability") -> bool:
+        if not delete_menu_availability.shows_delete_option():
+            return False
+        return self.matches(constants.MENU_DELETE)
 
 
 @dataclass(order=True)
@@ -135,6 +140,23 @@ class DisplayIndex:
         current_value = self.value
         display_index_start = constants.DISPLAY_INDEX_START
         return current_value - display_index_start
+
+
+@dataclass(frozen=True)
+class DeleteMenuAvailability:
+    value: bool
+
+    @classmethod
+    def configured(cls) -> "DeleteMenuAvailability":
+        return cls(constants.ENABLE_DELETE_MENU)
+
+    def shows_delete_option(self) -> bool:
+        return self.value
+
+    def maximum_menu_choice(self) -> int:
+        if self.shows_delete_option():
+            return constants.MENU_MAX_CHOICE_WITH_DELETE
+        return constants.MENU_MAX_CHOICE_WITHOUT_DELETE
 
 
 @dataclass(order=True)

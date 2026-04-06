@@ -1,7 +1,5 @@
-from typing import Optional
-
 import app.config.constants as constants
-from app.application.play.quiz_session_models import QuizSessionResult
+from app.application.play.quiz_session_models import QuizPerformance
 from app.application.state.game_exit_persistence import GameExitPersistence
 from app.application.state.game_runtime_state import GameRuntimeState
 from app.console.interface import ConsoleInterface
@@ -25,11 +23,15 @@ class GameShutdownService:
     def handle_interrupted_session(
         self,
         runtime_state: GameRuntimeState,
-        result: Optional[QuizSessionResult],
+        result: QuizPerformance | None,
     ) -> None:
         game_exit_persistence = self.game_exit_persistence
         console_interface = self.console_interface
-        if game_exit_persistence.persist_interrupted_session(runtime_state, result):
+        record_update_status = game_exit_persistence.persist_interrupted_session(
+            runtime_state,
+            result,
+        )
+        if record_update_status.is_updated():
             console_interface.show_message(constants.MESSAGE_BEST_SCORE_UPDATED)
 
         console_interface.show_message(constants.MESSAGE_INTERRUPTED_EXIT)

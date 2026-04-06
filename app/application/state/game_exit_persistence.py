@@ -1,7 +1,8 @@
 from typing import Optional
 
+from app.application.play.best_score_service import RecordUpdateStatus
 from app.application.play.quiz_result_recorder import QuizResultRecorder
-from app.application.play.quiz_session_models import QuizSessionResult
+from app.application.play.quiz_session_models import QuizPerformance
 from app.application.state.game_persistence_service import GamePersistenceService
 from app.application.state.game_runtime_state import GameRuntimeState
 
@@ -26,15 +27,15 @@ class GameExitPersistence:
     def persist_interrupted_session(
         self,
         runtime_state: GameRuntimeState,
-        result: Optional[QuizSessionResult],
-    ) -> bool:
+        result: QuizPerformance | None,
+    ) -> RecordUpdateStatus:
         if result is not None:
             result_recorder = self.result_recorder
             persistence_service = self.persistence_service
-            recorded_result = result_recorder.record(runtime_state, result)
+            score_outcome = result_recorder.record(runtime_state, result)
             persistence_service.save_runtime_state(runtime_state)
-            return recorded_result.is_new_record
+            return score_outcome.record_update_status()
 
         persistence_service = self.persistence_service
         persistence_service.save_runtime_state(runtime_state)
-        return False
+        return RecordUpdateStatus.unchanged()

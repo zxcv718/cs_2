@@ -3,11 +3,11 @@ from typing import Optional
 from app.application.play.question_count_chooser import QuestionCountChooser
 from app.application.play.quiz_partial_result_builder import QuizPartialResultBuilder
 from app.application.play.quiz_question_round_service import QuizQuestionRoundService
-from app.application.play.quiz_session_models import QuizSessionResult
+from app.application.play.quiz_session_models import QuizPerformance
 from app.application.play.quiz_round_coordinator import QuizRoundCoordinator
 from app.console.interface import ConsoleInterface
-from app.model.quiz import Quiz
 from app.model.quiz_catalog import QuizCatalog
+from app.model.quiz_selection import QuizSelection
 from app.service.quiz_metrics import QuestionCount
 
 
@@ -29,7 +29,7 @@ class QuizSessionService:
         )
 
     # 퀴즈 플레이 한 번을 끝까지 진행하고 결과를 돌려줍니다.
-    def play(self, quiz_catalog: QuizCatalog) -> Optional[QuizSessionResult]:
+    def play(self, quiz_catalog: QuizCatalog) -> QuizPerformance | None:
         question_count_chooser = self.question_count_chooser
         quiz_round_coordinator = self.quiz_round_coordinator
         if not quiz_catalog:
@@ -37,11 +37,12 @@ class QuizSessionService:
             return None
 
         # 문제 수를 고르고, 그 수만큼 랜덤으로 출제합니다.
-        question_count = self.choose_question_count(len(quiz_catalog))
+        total_questions = QuestionCount(len(quiz_catalog))
+        question_count = self.choose_question_count(total_questions)
         selected_quizzes = self._select_quizzes(quiz_catalog, question_count)
         return quiz_round_coordinator.play_selected_quizzes(selected_quizzes)
 
-    def choose_question_count(self, total_questions: int) -> QuestionCount:
+    def choose_question_count(self, total_questions: QuestionCount) -> QuestionCount:
         question_count_chooser = self.question_count_chooser
         return question_count_chooser.choose_question_count(total_questions)
 
@@ -49,5 +50,5 @@ class QuizSessionService:
         self,
         quiz_catalog: QuizCatalog,
         question_count: QuestionCount,
-    ) -> list[Quiz]:
+    ) -> QuizSelection:
         return quiz_catalog.randomized_selection(question_count)

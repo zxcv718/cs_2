@@ -31,4 +31,4 @@ class GameBootstrapService:
         except OSError:
             state = default_state_recovery.recover_for_read_error(show_error)
 
-        runtime_state.apply_loaded_state(state)
+        runtime_state.restore(state)

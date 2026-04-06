@@ -4,6 +4,7 @@ from app.application.play.quiz_session_models import QuizSessionInterrupted
 from app.application.state.game_bootstrap_service import GameBootstrapService
 from app.application.state.game_runtime_state import GameRuntimeState
 from app.console.interface import ConsoleInterface
+from app.service.quiz_metrics import DeleteMenuAvailability
 
 
 class QuizGameExecution:
@@ -33,21 +34,21 @@ class QuizGameExecution:
         console_interface: ConsoleInterface,
     ) -> None:
         self.initialize_state(runtime_state, console_interface)
-        has_delete = constants.ENABLE_DELETE_MENU
-        maximum_menu_choice = self._maximum_menu_choice(has_delete)
+        delete_menu_availability = DeleteMenuAvailability.configured()
+        maximum_menu_choice = delete_menu_availability.maximum_menu_choice()
         menu_action_dispatcher = self.menu_action_dispatcher
         while True:
             try:
                 should_continue = self._dispatched_once(
                     runtime_state,
-                    has_delete,
+                    delete_menu_availability,
                     maximum_menu_choice,
                     console_interface,
                 )
             except QuizSessionInterrupted as interrupted:
                 menu_action_dispatcher.handle_interrupted_session(
                     runtime_state,
-                    interrupted.partial_result,
+                    interrupted.partial_performance,
                 )
                 return
             except (KeyboardInterrupt, EOFError):
@@ -59,12 +60,12 @@ class QuizGameExecution:
     def _dispatched_once(
         self,
         runtime_state: GameRuntimeState,
-        has_delete: bool,
+        delete_menu_availability: DeleteMenuAvailability,
         maximum_menu_choice: int,
         console_interface: ConsoleInterface,
     ) -> bool:
         menu_action_dispatcher = self.menu_action_dispatcher
-        console_interface.show_menu(has_delete=has_delete)
+        console_interface.show_menu(delete_menu_availability)
         menu_choice = console_interface.request_menu_choice(
             constants.MENU_MIN_CHOICE,
             maximum_menu_choice,
@@ -72,11 +73,6 @@ class QuizGameExecution:
         return menu_action_dispatcher.dispatch(
             menu_choice,
             runtime_state,
-            has_delete,
+            delete_menu_availability,
             console_interface,
         )
-
-    def _maximum_menu_choice(self, has_delete: bool) -> int:
-        if has_delete:
-            return constants.MENU_MAX_CHOICE_WITH_DELETE
-        return constants.MENU_MAX_CHOICE_WITHOUT_DELETE

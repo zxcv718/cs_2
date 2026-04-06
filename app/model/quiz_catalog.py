@@ -6,6 +6,7 @@ from typing import Iterator
 
 import app.config.constants as constants
 from app.model.quiz import Quiz
+from app.model.quiz_selection import QuizSelection
 from app.service.quiz_metrics import DisplayIndex, QuestionCount
 
 
@@ -30,10 +31,10 @@ class QuizCatalog:
         items = self.items
         items.append(quiz)
 
-    def randomized_selection(self, question_count: QuestionCount) -> list[Quiz]:
+    def randomized_selection(self, question_count: QuestionCount) -> QuizSelection:
         working_items = list(self.items)
         random.shuffle(working_items)
-        return working_items[: int(question_count)]
+        return QuizSelection.from_items(working_items[: int(question_count)])
 
     def remove_by_display_index(self, display_index: DisplayIndex) -> Quiz:
         items = self.items

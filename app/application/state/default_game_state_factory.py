@@ -1,7 +1,10 @@
 from typing import Any, Optional
 
 import app.config.constants as constants
+from app.application.state.game_record_book import GameRecordBook
+from app.application.state.game_snapshot import GameSnapshot
 from app.model.quiz import Quiz
+from app.model.quiz_catalog import QuizCatalog
 from app.model.quiz_factory import QuizFactory
 
 
@@ -26,7 +29,7 @@ class DefaultGameStateFactory:
     def __init__(self, quiz_factory: Optional[QuizFactory] = None) -> None:
         self.quiz_factory = quiz_factory or QuizFactory()
 
-    def create_quizzes(self) -> list[Quiz]:
+    def _create_quizzes(self) -> list[Quiz]:
         """
         상수에 들어 있는 기본 퀴즈 데이터를 Quiz 객체 목록으로 변환합니다.
 
@@ -35,7 +38,7 @@ class DefaultGameStateFactory:
         """
         return [self._quiz(item) for item in constants.DEFAULT_QUIZ_DATA]
 
-    def create_state(self) -> dict[str, Any]:
+    def create_state(self) -> GameSnapshot:
         """
         게임 시작 시 사용할 기본 상태 딕셔너리를 만듭니다.
 
@@ -44,11 +47,10 @@ class DefaultGameStateFactory:
         - best_score: 아직 최고 점수가 없으므로 None
         - history: 아직 플레이 기록이 없으므로 빈 리스트
         """
-        return {
-            constants.STATE_KEY_QUIZZES: self.create_quizzes(),
-            constants.STATE_KEY_BEST_SCORE: None,
-            constants.STATE_KEY_HISTORY: [],
-        }
+        return GameSnapshot(
+            QuizCatalog.from_items(self._create_quizzes()),
+            GameRecordBook.create_empty(),
+        )
 
     def _quiz(self, item: dict[str, Any]) -> Quiz:
         quiz_factory = self.quiz_factory

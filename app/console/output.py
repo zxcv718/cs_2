@@ -4,15 +4,15 @@ import app.config.constants as constants
 from app.model.quiz import Quiz
 from app.model.quiz_catalog import QuizCatalog
 from app.presentation.quiz_presenter import QuizPresenter
-from app.service.quiz_metrics import DisplayIndex, QuestionCount
+from app.service.quiz_metrics import DeleteMenuAvailability, DisplayIndex, QuestionCount
 
 
 class ConsoleOutput:
     def __init__(self, quiz_presenter: QuizPresenter | None = None) -> None:
         self.quiz_presenter = quiz_presenter or QuizPresenter()
 
-    def show_menu(self, has_delete: bool = False) -> None:
-        menu_lines = self._menu_lines(has_delete)
+    def show_menu(self, delete_menu_availability: DeleteMenuAvailability) -> None:
+        menu_lines = self._menu_lines(delete_menu_availability)
         separator = constants.PRIMARY_SEPARATOR
         app_title = constants.APP_TITLE
         separator_length = constants.SEPARATOR_LENGTH
@@ -85,12 +85,15 @@ class ConsoleOutput:
         self._hint_usage(hint_used_count)
         print(separator)
 
-    def _menu_lines(self, has_delete: bool) -> tuple[str, ...]:
+    def _menu_lines(
+        self,
+        delete_menu_availability: DeleteMenuAvailability,
+    ) -> tuple[str, ...]:
         menu_lines_by_delete = {
             True: constants.MENU_LINES_WITH_DELETE,
             False: constants.MENU_LINES_WITHOUT_DELETE,
         }
-        return menu_lines_by_delete[has_delete]
+        return menu_lines_by_delete[delete_menu_availability.shows_delete_option()]
 
     def _print_lines(self, lines: tuple[str, ...]) -> None:
         for line in lines:

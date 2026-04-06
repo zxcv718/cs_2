@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Iterator, Optional
 
 import app.config.constants as constants
 
@@ -17,6 +17,9 @@ class QuestionText:
         if not normalized:
             raise ValueError(constants.ERROR_QUESTION_MUST_NOT_BE_EMPTY)
         return cls(normalized)
+
+    def __str__(self) -> str:
+        return self.value
 
 
 @dataclass(frozen=True)
@@ -47,6 +50,16 @@ class ChoiceSet:
         if not normalized:
             raise ValueError(constants.ERROR_CHOICE_MUST_NOT_BE_EMPTY)
         return normalized
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.values)
+
+    def choice_texts(self) -> tuple[str, ...]:
+        return tuple(self.values)
+
+    def choice_text(self, answer_number: "AnswerNumber") -> str:
+        choice_index = int(answer_number) - constants.DISPLAY_INDEX_START
+        return self.values[choice_index]
 
 
 @dataclass(frozen=True)
@@ -99,6 +112,9 @@ class HintText:
         if not normalized:
             return None
         return cls(normalized)
+
+    def __str__(self) -> str:
+        return self.value
 
 
 @dataclass(frozen=True)

@@ -14,19 +14,15 @@ class QuizPayloadMapper:
     def to_payload(self, quiz: Quiz) -> dict[str, Any]:
         if not isinstance(quiz, Quiz):
             raise ValueError(constants.ERROR_QUIZ_MUST_BE_INSTANCE)
-        prompt = quiz.prompt
-        solution = quiz.solution
-        question_text = prompt.question_text
-        choice_set = prompt.choice_set
         item: dict[str, Any] = {
-            constants.QUIZ_FIELD_QUESTION: question_text.value,
-            constants.QUIZ_FIELD_CHOICES: list(choice_set.values),
-            constants.QUIZ_FIELD_ANSWER: int(solution.answer_number),
+            constants.QUIZ_FIELD_QUESTION: quiz.question_text(),
+            constants.QUIZ_FIELD_CHOICES: list(quiz.choice_texts()),
+            constants.QUIZ_FIELD_ANSWER: quiz.answer_number(),
         }
-        hint_text = solution.hint_text
+        hint_text = quiz.hint_text()
         if hint_text is None:
             return item
-        item[constants.QUIZ_FIELD_HINT] = hint_text.value
+        item[constants.QUIZ_FIELD_HINT] = hint_text
         return item
 
     # 저장된 딕셔너리를 Quiz 객체로 복원합니다.

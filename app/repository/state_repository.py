@@ -6,7 +6,7 @@ from tempfile import NamedTemporaryFile
 from typing import Any, Optional, Union
 
 import app.config.constants as constants
-from app.model.quiz import Quiz
+from app.application.state.game_snapshot import GameSnapshot
 from app.repository.state_payload_mapper import StatePayloadMapper
 
 
@@ -22,7 +22,7 @@ class StateRepository:
         self.payload_mapper = payload_mapper or StatePayloadMapper()
 
     # 파일에서 게임 상태를 읽어 파이썬 객체로 바꿉니다.
-    def load_state(self) -> dict[str, Any]:
+    def load_state(self) -> GameSnapshot:
         try:
             data = self._loaded_json()
         except FileNotFoundError:
@@ -36,12 +36,10 @@ class StateRepository:
     # 현재 게임 상태를 JSON 파일로 저장합니다.
     def save_state(
         self,
-        quizzes: list[Quiz],
-        best_score: Optional[int],
-        history: Optional[list[dict[str, Any]]] = None,
+        game_snapshot: GameSnapshot,
     ) -> None:
         payload_mapper = self.payload_mapper
-        payload = payload_mapper.to_payload(quizzes, best_score, history)
+        payload = payload_mapper.to_payload(game_snapshot)
 
         # 폴더가 없으면 먼저 만들고 파일을 저장합니다.
         # dump는 파이썬 객체를 json형식으로 파일에 바로 저장하는 함수
@@ -88,7 +86,7 @@ class StateRepository:
         ) as file:
             return json.load(file)
 
-    def _validated_state(self, data: Any) -> dict[str, Any]:
+    def _validated_state(self, data: Any) -> GameSnapshot:
         payload_mapper = self.payload_mapper
         try:
             return payload_mapper.from_payload(data)

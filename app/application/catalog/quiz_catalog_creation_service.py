@@ -2,6 +2,7 @@ from typing import Optional
 
 import app.config.constants as constants
 from app.console.interface import ConsoleInterface
+from app.model.quiz import Quiz
 from app.model.quiz_catalog import QuizCatalog
 from app.model.quiz_factory import QuizFactory
 
@@ -15,7 +16,7 @@ class QuizCatalogCreationService:
         self.console_interface = console_interface
         self.quiz_factory = quiz_factory or QuizFactory()
 
-    def add_quiz(self, quiz_catalog: QuizCatalog) -> bool:
+    def add_quiz(self, quiz_catalog: QuizCatalog) -> Quiz:
         console_interface = self.console_interface
         quiz_factory = self.quiz_factory
         question_prompt = constants.PROMPT_ENTER_QUESTION
@@ -38,7 +39,7 @@ class QuizCatalogCreationService:
         quiz_catalog.append(created_quiz)
         added_message = constants.MESSAGE_QUIZ_ADDED
         console_interface.show_message(added_message)
-        return True
+        return created_quiz
 
     def _choices(self, console_interface: ConsoleInterface) -> list[str]:
         return [

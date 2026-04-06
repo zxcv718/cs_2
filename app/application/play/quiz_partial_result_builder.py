@@ -1,34 +1,29 @@
 import app.config.constants as constants
-from app.application.play.quiz_session_models import QuizSessionResult
-from app.service.quiz_metrics import CorrectAnswerCount, HintUsageCount, QuestionCount
-from typing import Optional
+from app.application.play.quiz_session_models import AnswerTally, QuizPerformance
+from app.service.quiz_metrics import QuestionCount
 
 
 class QuizPartialResultBuilder:
-    def build_completed_result(
+    def build_performance(
         self,
         total_questions: QuestionCount,
-        correct_count: CorrectAnswerCount,
-        hint_used_count: HintUsageCount,
-    ) -> QuizSessionResult:
-        return QuizSessionResult(
-            total_questions=total_questions,
-            correct_count=correct_count,
-            hint_used_count=hint_used_count,
+        answer_tally: AnswerTally,
+    ) -> QuizPerformance:
+        return QuizPerformance(
+            total_questions,
+            answer_tally,
         )
 
     def build_interrupted_result(
         self,
         total_questions: QuestionCount,
-        correct_count: CorrectAnswerCount,
-        hint_used_count: HintUsageCount,
+        answer_tally: AnswerTally,
         answered_question_count: QuestionCount,
-    ) -> Optional[QuizSessionResult]:
+    ) -> QuizPerformance | None:
         if int(answered_question_count) < constants.DISPLAY_INDEX_START:
             return None
 
-        return self.build_completed_result(
+        return self.build_performance(
             total_questions,
-            correct_count,
-            hint_used_count,
+            answer_tally,
         )
