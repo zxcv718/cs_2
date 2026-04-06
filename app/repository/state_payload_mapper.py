@@ -21,9 +21,10 @@ class StatePayloadMapper:
         if best_score is not None and not self._is_int(best_score):
             raise ValueError(constants.ERROR_BEST_SCORE_MUST_BE_INTEGER_OR_NONE)
 
+        quiz_mapper = self.quiz_mapper
         payload: dict[str, Any] = {
             constants.STATE_KEY_QUIZZES: [
-                self.quiz_mapper.to_payload(quiz) for quiz in quizzes
+                quiz_mapper.to_payload(quiz) for quiz in quizzes
             ],
             constants.STATE_KEY_BEST_SCORE: best_score,
         }
@@ -54,9 +55,10 @@ class StatePayloadMapper:
         if not isinstance(history_data, list):
             raise ValueError(constants.ERROR_HISTORY_MUST_BE_LIST)
 
+        quiz_mapper = self.quiz_mapper
         return {
             constants.STATE_KEY_QUIZZES: [
-                self.quiz_mapper.from_payload(item) for item in quizzes_data
+                quiz_mapper.from_payload(item) for item in quizzes_data
             ],
             constants.STATE_KEY_BEST_SCORE: best_score,
             constants.STATE_KEY_HISTORY: [
@@ -81,8 +83,9 @@ class StatePayloadMapper:
         ):
             value = item.get(key)
             if not self._is_int(value) or value < constants.MINIMUM_SCORE:
+                error_template = constants.ERROR_NON_NEGATIVE_INTEGER_TEMPLATE
                 raise ValueError(
-                    constants.ERROR_NON_NEGATIVE_INTEGER_TEMPLATE.format(key=key)
+                    error_template.format(key=key)
                 )
 
         # "맞힌 문제 수 > 전체 문제 수" 같은 모순된 기록은
@@ -97,8 +100,9 @@ class StatePayloadMapper:
             constants.INITIAL_HINT_USED_COUNT,
         )
         if not self._is_int(hint_used_count) or hint_used_count < constants.MINIMUM_SCORE:
+            error_template = constants.ERROR_NON_NEGATIVE_INTEGER_TEMPLATE
             raise ValueError(
-                constants.ERROR_NON_NEGATIVE_INTEGER_TEMPLATE.format(
+                error_template.format(
                     key=constants.HISTORY_FIELD_HINT_USED_COUNT
                 )
             )

@@ -14,7 +14,7 @@ from app.service.quiz_metrics import ScoreValue
 if TYPE_CHECKING:
     from app.service.game_bootstrap_service import GameBootstrapService
     from app.service.game_state_service import GameStateService
-    from app.ui.console_ui import ConsoleUI
+    from app.console_interface import ConsoleInterface
 
 
 @dataclass
@@ -28,17 +28,19 @@ class GameRuntimeState:
         best_score: int | None,
         history: list[dict[str, Any]],
     ) -> None:
-        self.quiz_catalog = QuizCatalog.from_items(quizzes)
+        quiz_catalog = QuizCatalog.from_items(quizzes)
         history_entries = GameHistory.from_entries(history)
         wrapped_best_score = self._wrapped_score(best_score)
         record_book = GameRecordBook(wrapped_best_score, history_entries)
+        self.quiz_catalog = quiz_catalog
         self.game_lifecycle = GameLifecycle(record_book, True)
 
     def apply_loaded_state(self, state: dict[str, Any]) -> None:
+        history_key = constants.STATE_KEY_HISTORY
         self.restore(
             state[constants.STATE_KEY_QUIZZES],
             state[constants.STATE_KEY_BEST_SCORE],
-            state.get(constants.STATE_KEY_HISTORY, []),
+            state.get(history_key, []),
         )
 
     def record_play_result(
@@ -46,28 +48,31 @@ class GameRuntimeState:
         best_score: ScoreValue | None,
         history_entry: dict[str, Any],
     ) -> None:
-        self.game_lifecycle.record_book.record(best_score, history_entry)
+        record_book = self.game_lifecycle.record_book
+        record_book.record(best_score, history_entry)
 
     def initialize_with(
         self,
         game_bootstrap_service: GameBootstrapService,
-        console_interface: ConsoleUI,
+        console_interface: "ConsoleInterface",
     ) -> None:
-        if self.game_lifecycle.initialized:
+        game_lifecycle = self.game_lifecycle
+        if game_lifecycle.initialized:
             return
         game_bootstrap_service.initialize(self, console_interface)
 
     def save_with(self, game_state_service: GameStateService) -> None:
+        record_book = self.game_lifecycle.record_book
         game_state_service.save_state(
             list(self.quiz_catalog),
-            _score_value_or_none(self.game_lifecycle.record_book.best_score),
-            list(self.game_lifecycle.record_book.history),
+            _score_value_or_none(record_book.best_score),
+            list(record_book.history),
         )
 
-    def show_best_score_on(self, console_interface: ConsoleUI) -> None:
-        console_interface.display_best_score(
-            _score_value_or_none(self.game_lifecycle.record_book.best_score)
-        )
+    def show_best_score_on(self, console_interface: "ConsoleInterface") -> None:
+        record_book = self.game_lifecycle.record_book
+        best_score = _score_value_or_none(record_book.best_score)
+        console_interface.display_best_score(best_score)
 
     def _wrapped_score(self, best_score: int | None) -> ScoreValue | None:
         if best_score is None:

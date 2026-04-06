@@ -28,14 +28,16 @@ class QuizResultRecorder:
         runtime_state: GameRuntimeState,
         result: QuizSessionResult,
     ) -> RecordedQuizResult:
-        score_record = self.score_keeper.keep(
-            runtime_state.game_lifecycle.record_book.best_score,
+        score_keeper = self.score_keeper
+        game_lifecycle = runtime_state.game_lifecycle
+        record_book = game_lifecycle.record_book
+        score_record = score_keeper.keep(
+            record_book.best_score,
             result,
         )
-        runtime_state.record_play_result(
-            score_record.best_score,
-            self.history_service.create_entry(result, score_record.score),
-        )
+        history_service = self.history_service
+        history_entry = history_service.create_entry(result, score_record.score)
+        runtime_state.record_play_result(score_record.best_score, history_entry)
         return RecordedQuizResult(
             score_record.score,
             score_record.best_score,

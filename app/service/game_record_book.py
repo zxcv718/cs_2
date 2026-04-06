@@ -15,4 +15,5 @@ class GameRecordBook:
 
     def record(self, best_score: ScoreValue | None, history_entry: dict[str, object]) -> None:
         self.best_score = best_score
-        self.history.append(history_entry)
+        history = self.history
+        history.append(history_entry)

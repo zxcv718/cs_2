@@ -3,7 +3,7 @@ from app.model.quiz import Quiz
 from app.model.quiz_catalog import QuizCatalog
 from app.model.quiz_factory import QuizFactory
 from app.service.quiz_metrics import DisplayIndex
-from app.ui.console_ui import ConsoleUI
+from app.console_interface import ConsoleInterface
 from typing import Optional
 
 
@@ -11,7 +11,7 @@ from typing import Optional
 class QuizCatalogService:
     def __init__(
         self,
-        console_interface: ConsoleUI,
+        console_interface: ConsoleInterface,
         quiz_factory: Optional[QuizFactory] = None,
     ) -> None:
         self.console_interface = console_interface
@@ -23,13 +23,7 @@ class QuizCatalogService:
         quiz_factory = self.quiz_factory
         question_prompt = constants.PROMPT_ENTER_QUESTION
         question = console_interface.request_non_empty_text(question_prompt)
-        choices = [
-            console_interface.request_non_empty_text(self._choice_prompt(index))
-            for index in range(
-                constants.DISPLAY_INDEX_START,
-                constants.CHOICE_COUNT + constants.DISPLAY_INDEX_START,
-            )
-        ]
+        choices = self._choices(console_interface)
         answer = console_interface.request_valid_number(
             self._answer_prompt(),
             constants.MIN_ANSWER,
@@ -46,7 +40,8 @@ class QuizCatalogService:
 
     # 퀴즈 전체 목록을 화면에 보여줍니다.
     def list_quizzes(self, quiz_catalog: QuizCatalog) -> None:
-        self.console_interface.show_quiz_list(quiz_catalog)
+        console_interface = self.console_interface
+        console_interface.show_quiz_list(quiz_catalog)
 
     # 사용자가 고른 번호의 퀴즈를 삭제합니다.
     def delete_quiz(self, quiz_catalog: QuizCatalog) -> bool:
@@ -69,6 +64,17 @@ class QuizCatalogService:
         removed_quiz = quiz_catalog.remove_by_display_index(DisplayIndex(index))
         console_interface.show_message(self._deleted_message(removed_quiz))
         return True
+
+    def _choices(self, console_interface: ConsoleInterface) -> list[str]:
+        return [
+            console_interface.request_non_empty_text(self._choice_prompt(index))
+            for index in self._choice_indexes()
+        ]
+
+    def _choice_indexes(self) -> range:
+        start = constants.DISPLAY_INDEX_START
+        stop = constants.CHOICE_COUNT + constants.DISPLAY_INDEX_START
+        return range(start, stop)
 
     def _choice_prompt(self, index: int) -> str:
         template = constants.PROMPT_ENTER_CHOICE_TEMPLATE

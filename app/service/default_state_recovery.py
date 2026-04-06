@@ -42,10 +42,12 @@ class DefaultStateRecovery:
         should_save: bool,
     ) -> dict[str, Any]:
         notify(message)
-        state = self.default_state_factory.create_state()
+        default_state_factory = self.default_state_factory
+        state = default_state_factory.create_state()
         if not should_save:
             return state
-        self.persistence_service.save_state_values(
+        persistence_service = self.persistence_service
+        persistence_service.save_state_values(
             state[constants.STATE_KEY_QUIZZES],
             state[constants.STATE_KEY_BEST_SCORE],
             state[constants.STATE_KEY_HISTORY],

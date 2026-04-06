@@ -28,11 +28,13 @@ class QuizScoreKeeper:
         best_score: Optional[ScoreValue],
         result: QuizSessionResult,
     ) -> ScoreRecord:
-        score = self.scoring_service.calculate_score(
+        scoring_service = self.scoring_service
+        score = scoring_service.calculate_score(
             result.correct_count,
             result.hint_used_count,
         )
-        updated_best_score, is_new_record = self.best_score_service.update_best_score(
+        best_score_service = self.best_score_service
+        updated_best_score, is_new_record = best_score_service.update_best_score(
             best_score,
             score,
         )

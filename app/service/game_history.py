@@ -19,4 +19,5 @@ class GameHistory:
         return len(self.entries)
 
     def append(self, entry: dict[str, Any]) -> None:
-        self.entries.append(entry)
+        entries = self.entries
+        entries.append(entry)

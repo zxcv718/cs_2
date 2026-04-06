@@ -13,17 +13,26 @@ class QuizCatalogWorkflow:
         self.persistence_service = persistence_service
 
     def add(self, runtime_state: GameRuntimeState) -> None:
-        if not self.quiz_catalog_service.add_quiz(runtime_state.quiz_catalog):
+        quiz_catalog_service = self.quiz_catalog_service
+        quiz_catalog = runtime_state.quiz_catalog
+        if not quiz_catalog_service.add_quiz(quiz_catalog):
             return
-        self.persistence_service.save_runtime_state(runtime_state)
+        persistence_service = self.persistence_service
+        persistence_service.save_runtime_state(runtime_state)
 
     def delete(self, runtime_state: GameRuntimeState) -> None:
-        if not self.quiz_catalog_service.delete_quiz(runtime_state.quiz_catalog):
+        quiz_catalog_service = self.quiz_catalog_service
+        quiz_catalog = runtime_state.quiz_catalog
+        if not quiz_catalog_service.delete_quiz(quiz_catalog):
             return
-        self.persistence_service.save_runtime_state(runtime_state)
+        persistence_service = self.persistence_service
+        persistence_service.save_runtime_state(runtime_state)
 
     def show_list(self, runtime_state: GameRuntimeState) -> None:
-        self.quiz_catalog_service.list_quizzes(runtime_state.quiz_catalog)
+        quiz_catalog_service = self.quiz_catalog_service
+        quiz_catalog = runtime_state.quiz_catalog
+        quiz_catalog_service.list_quizzes(quiz_catalog)
 
     def persist(self, runtime_state: GameRuntimeState) -> None:
-        self.persistence_service.save_runtime_state(runtime_state)
+        persistence_service = self.persistence_service
+        persistence_service.save_runtime_state(runtime_state)

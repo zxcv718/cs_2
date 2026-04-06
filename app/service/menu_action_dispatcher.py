@@ -3,7 +3,7 @@ from app.service.game_runtime_state import GameRuntimeState
 from app.service.game_shutdown_service import GameShutdownService
 from app.service.menu_execution import MenuExecution
 from app.service.quiz_metrics import MenuChoice
-from app.ui.console_ui import ConsoleUI
+from app.console_interface import ConsoleInterface
 
 
 class MenuActionDispatcher:
@@ -20,7 +20,7 @@ class MenuActionDispatcher:
         menu_choice: MenuChoice,
         runtime_state: GameRuntimeState,
         has_delete: bool,
-        console_interface: ConsoleUI,
+        console_interface: ConsoleInterface,
     ) -> bool:
         menu_execution = self.menu_execution
         game_shutdown_service = self.game_shutdown_service

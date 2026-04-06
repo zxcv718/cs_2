@@ -4,14 +4,14 @@ import app.config.constants as constants
 from app.model.quiz import Quiz
 from app.service.game_runtime_state import GameRuntimeState
 from app.service.game_state_service import GameStateService
-from app.ui.console_ui import ConsoleUI
+from app.console_interface import ConsoleInterface
 
 
 class GamePersistenceService:
     def __init__(
         self,
         state_service: GameStateService,
-        console_interface: ConsoleUI,
+        console_interface: ConsoleInterface,
     ) -> None:
         self.state_service = state_service
         self.console_interface = console_interface

@@ -16,10 +16,12 @@ class GameExitPersistence:
         self.result_recorder = result_recorder
 
     def persist_normal_exit(self, runtime_state: GameRuntimeState) -> None:
-        self.persistence_service.save_runtime_state(runtime_state)
+        persistence_service = self.persistence_service
+        persistence_service.save_runtime_state(runtime_state)
 
     def persist_interrupted_program(self, runtime_state: GameRuntimeState) -> None:
-        self.persistence_service.save_runtime_state(runtime_state)
+        persistence_service = self.persistence_service
+        persistence_service.save_runtime_state(runtime_state)
 
     def persist_interrupted_session(
         self,
@@ -27,9 +29,12 @@ class GameExitPersistence:
         result: Optional[QuizSessionResult],
     ) -> bool:
         if result is not None:
-            recorded_result = self.result_recorder.record(runtime_state, result)
-            self.persistence_service.save_runtime_state(runtime_state)
+            result_recorder = self.result_recorder
+            persistence_service = self.persistence_service
+            recorded_result = result_recorder.record(runtime_state, result)
+            persistence_service.save_runtime_state(runtime_state)
             return recorded_result.is_new_record
 
-        self.persistence_service.save_runtime_state(runtime_state)
+        persistence_service = self.persistence_service
+        persistence_service.save_runtime_state(runtime_state)
         return False

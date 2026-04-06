@@ -40,7 +40,8 @@ class QuizRoundCoordinator:
                 start=constants.DISPLAY_INDEX_START,
             ):
                 display_index = DisplayIndex(raw_index)
-                round_result = self.question_round_service.play_round(
+                question_round_service = self.question_round_service
+                round_result = question_round_service.play_round(
                     quiz,
                     display_index,
                     total_questions,
@@ -50,8 +51,9 @@ class QuizRoundCoordinator:
                 answered_question_count = answered_question_count.incremented()
         except QuizQuestionRoundInterrupted as interrupted:
             hint_used_count = hint_used_count.add(interrupted.hint_used_count)
+            partial_result_builder = self.partial_result_builder
             raise QuizSessionInterrupted(
-                self.partial_result_builder.build_interrupted_result(
+                partial_result_builder.build_interrupted_result(
                     total_questions,
                     correct_count,
                     hint_used_count,
@@ -59,7 +61,8 @@ class QuizRoundCoordinator:
                 )
             ) from interrupted
 
-        return self.partial_result_builder.build_completed_result(
+        partial_result_builder = self.partial_result_builder
+        return partial_result_builder.build_completed_result(
             total_questions,
             correct_count,
             hint_used_count,

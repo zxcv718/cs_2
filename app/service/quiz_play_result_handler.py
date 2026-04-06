@@ -3,7 +3,7 @@ from app.service.game_persistence_service import GamePersistenceService
 from app.service.game_runtime_state import GameRuntimeState
 from app.service.quiz_result_recorder import QuizResultRecorder
 from app.service.quiz_session_models import QuizSessionResult
-from app.ui.console_ui import ConsoleUI
+from app.console_interface import ConsoleInterface
 
 
 class QuizPlayResultHandler:
@@ -17,7 +17,7 @@ class QuizPlayResultHandler:
 
     def handle(
         self,
-        console_interface: ConsoleUI,
+        console_interface: ConsoleInterface,
         runtime_state: GameRuntimeState,
         result: QuizSessionResult,
     ) -> None:

@@ -4,13 +4,13 @@ import app.config.constants as constants
 from app.service.game_exit_persistence import GameExitPersistence
 from app.service.game_runtime_state import GameRuntimeState
 from app.service.quiz_session_models import QuizSessionResult
-from app.ui.console_ui import ConsoleUI
+from app.console_interface import ConsoleInterface
 
 
 class GameShutdownService:
     def __init__(
         self,
-        console_interface: ConsoleUI,
+        console_interface: ConsoleInterface,
         game_exit_persistence: GameExitPersistence,
     ) -> None:
         self.console_interface = console_interface

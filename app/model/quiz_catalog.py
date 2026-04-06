@@ -27,7 +27,8 @@ class QuizCatalog:
         return bool(self.items)
 
     def append(self, quiz: Quiz) -> None:
-        self.items.append(quiz)
+        items = self.items
+        items.append(quiz)
 
     def randomized_selection(self, question_count: QuestionCount) -> list[Quiz]:
         working_items = list(self.items)
@@ -35,4 +36,6 @@ class QuizCatalog:
         return working_items[: int(question_count)]
 
     def remove_by_display_index(self, display_index: DisplayIndex) -> Quiz:
-        return self.items.pop(display_index.to_storage_index())
+        items = self.items
+        storage_index = display_index.to_storage_index()
+        return items.pop(storage_index)

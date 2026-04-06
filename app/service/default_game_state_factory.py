@@ -33,15 +33,7 @@ class DefaultGameStateFactory:
         예를 들어 문제 형식이 바뀌거나 Quiz 생성자 인자가 달라져도
         이 메서드만 수정하면 되므로 유지보수가 쉬워집니다.
         """
-        return [
-            self.quiz_factory.create(
-                item[constants.QUIZ_FIELD_QUESTION],
-                list(item[constants.QUIZ_FIELD_CHOICES]),
-                item[constants.QUIZ_FIELD_ANSWER],
-                hint=item.get(constants.QUIZ_FIELD_HINT),
-            )
-            for item in constants.DEFAULT_QUIZ_DATA
-        ]
+        return [self._quiz(item) for item in constants.DEFAULT_QUIZ_DATA]
 
     def create_state(self) -> dict[str, Any]:
         """
@@ -57,3 +49,11 @@ class DefaultGameStateFactory:
             constants.STATE_KEY_BEST_SCORE: None,
             constants.STATE_KEY_HISTORY: [],
         }
+
+    def _quiz(self, item: dict[str, Any]) -> Quiz:
+        quiz_factory = self.quiz_factory
+        question = item[constants.QUIZ_FIELD_QUESTION]
+        choices = list(item[constants.QUIZ_FIELD_CHOICES])
+        answer = item[constants.QUIZ_FIELD_ANSWER]
+        hint = item.get(constants.QUIZ_FIELD_HINT)
+        return quiz_factory.create(question, choices, answer, hint=hint)

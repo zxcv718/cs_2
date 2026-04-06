@@ -25,11 +25,11 @@ from app.service.quiz_scoring_service import QuizScoringService
 from app.service.quiz_selection_service import QuizSelectionService
 from app.service.quiz_session_models import QuizSessionInterrupted, QuizSessionResult
 from app.service.quiz_session_service import QuizSessionService
-from app.ui.console_ui import ConsoleUI
+from app.console_interface import ConsoleInterface
 
 
 # 실제 입력 대신 테스트에서 사용할 가짜 UI입니다.
-class DummyUI(ConsoleUI):
+class DummyConsoleInterface(ConsoleInterface):
     def __init__(self):
         self.messages = []
         self.errors = []
@@ -43,7 +43,7 @@ class DummyUI(ConsoleUI):
         self.errors.append(message)
 
 
-class PlayMenuOnceUI(DummyUI):
+class PlayMenuOnceConsoleInterface(DummyConsoleInterface):
     def show_menu(self, has_delete=False):
         return None
 
@@ -54,7 +54,7 @@ class PlayMenuOnceUI(DummyUI):
         return None
 
 
-class InterruptingSessionUI(DummyUI):
+class InterruptingSessionConsoleInterface(DummyConsoleInterface):
     def __init__(self):
         super().__init__()
         self.answer_call_count = 0
@@ -72,7 +72,7 @@ class InterruptingSessionUI(DummyUI):
         raise KeyboardInterrupt
 
 
-class HintThenCorrectUI(DummyUI):
+class HintThenCorrectConsoleInterface(DummyConsoleInterface):
     def __init__(self):
         super().__init__()
         self.answer_call_count = 0
@@ -87,7 +87,7 @@ class HintThenCorrectUI(DummyUI):
         return 2
 
 
-class AnswerThenHintThenInterruptUI(DummyUI):
+class AnswerThenHintThenInterruptConsoleInterface(DummyConsoleInterface):
     def __init__(self):
         super().__init__()
         self.answer_call_count = 0
@@ -288,7 +288,7 @@ class QuizHistoryServiceTestCase(unittest.TestCase):
 
 class QuizSelectionServiceTestCase(unittest.TestCase):
     def test_choose_question_count_delegates_to_ui(self):
-        console_interface = InterruptingSessionUI()
+        console_interface = InterruptingSessionConsoleInterface()
         service = QuizSelectionService(console_interface)
 
         question_count = service.choose_question_count(5)
@@ -298,7 +298,7 @@ class QuizSelectionServiceTestCase(unittest.TestCase):
 
 class QuizQuestionRoundServiceTestCase(unittest.TestCase):
     def test_play_round_counts_hint_and_correct_answer(self):
-        console_interface = HintThenCorrectUI()
+        console_interface = HintThenCorrectConsoleInterface()
         service = QuizQuestionRoundService(console_interface)
         quiz = QuizFactory().create("문제", ["A", "B", "C", "D"], 2, hint="힌트")
 
@@ -329,7 +329,7 @@ class QuizPartialResultBuilderTestCase(unittest.TestCase):
 
 class QuizSessionServiceTestCase(unittest.TestCase):
     def test_play_raises_interrupted_with_partial_result_after_answer(self):
-        console_interface = InterruptingSessionUI()
+        console_interface = InterruptingSessionConsoleInterface()
         service = DeterministicQuizSessionService(console_interface)
         factory = QuizFactory()
         quizzes = [
@@ -350,7 +350,7 @@ class QuizSessionServiceTestCase(unittest.TestCase):
         self.assertEqual(int(partial_result.hint_used_count), 0)
 
     def test_play_keeps_hint_count_when_interrupted_after_showing_hint(self):
-        console_interface = AnswerThenHintThenInterruptUI()
+        console_interface = AnswerThenHintThenInterruptConsoleInterface()
         service = DeterministicQuizSessionService(console_interface)
         factory = QuizFactory()
         quizzes = [
@@ -376,9 +376,9 @@ class QuizGameTestCase(unittest.TestCase):
     def make_game(
         self,
         state_repository: Optional[DummyStateRepository] = None,
-        console_interface_override: Optional[DummyUI] = None,
+        console_interface_override: Optional[DummyConsoleInterface] = None,
     ) -> QuizGame:
-        console_interface = DummyUI()
+        console_interface = DummyConsoleInterface()
         if console_interface_override is not None:
             console_interface = console_interface_override
 
@@ -406,7 +406,7 @@ class QuizGameTestCase(unittest.TestCase):
 
     # 저장 실패 시 UI에 오류를 보여줘야 합니다.
     def test_persist_state_reports_save_error(self):
-        console_interface = DummyUI()
+        console_interface = DummyConsoleInterface()
         game = self.make_game(
             state_repository=FailingSaveStateRepository(),
             console_interface_override=console_interface,
@@ -418,7 +418,7 @@ class QuizGameTestCase(unittest.TestCase):
 
     # 저장 파일이 없으면 게임 상태를 기본값으로 준비해야 합니다.
     def test_initialize_state_uses_defaults_when_file_missing(self):
-        console_interface = DummyUI()
+        console_interface = DummyConsoleInterface()
         game = self.make_game(
             state_repository=MissingStateRepository(),
             console_interface_override=console_interface,
@@ -433,7 +433,7 @@ class QuizGameTestCase(unittest.TestCase):
 
     # 저장 파일이 잘못되면 오류를 표시하고 복구해야 합니다.
     def test_initialize_state_recovers_on_value_error(self):
-        console_interface = DummyUI()
+        console_interface = DummyConsoleInterface()
         game = self.make_game(
             state_repository=BrokenStateRepository(),
             console_interface_override=console_interface,
@@ -445,7 +445,7 @@ class QuizGameTestCase(unittest.TestCase):
         self.assertTrue(console_interface.errors)
 
     def test_run_persists_partial_result_when_session_is_interrupted(self):
-        console_interface = PlayMenuOnceUI()
+        console_interface = PlayMenuOnceConsoleInterface()
         repository = DummyStateRepository()
         factory = QuizFactory()
         repository.loaded_state = {

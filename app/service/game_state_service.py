@@ -11,7 +11,8 @@ class GameStateService:
 
     # 파일에서 게임 상태를 읽어 반환합니다.
     def load_state(self) -> dict[str, Any]:
-        return self.state_repository.load_state()
+        state_repository = self.state_repository
+        return state_repository.load_state()
 
     # 현재 상태를 저장소에 저장합니다.
     def save_state(
@@ -20,4 +21,5 @@ class GameStateService:
         best_score: Optional[int],
         history: list[dict[str, Any]],
     ) -> None:
-        self.state_repository.save_state(quizzes, best_score, history)
+        state_repository = self.state_repository
+        state_repository.save_state(quizzes, best_score, history)

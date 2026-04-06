@@ -21,11 +21,13 @@ class QuizPayloadMapper:
         if not isinstance(item, dict):
             raise ValueError(constants.ERROR_QUIZ_ITEM_MUST_BE_DICTIONARY)
 
-        question = item.get(constants.QUIZ_FIELD_QUESTION)
+        question_key = constants.QUIZ_FIELD_QUESTION
+        question = item.get(question_key)
         if not isinstance(question, str) or not question.strip():
             raise ValueError(constants.ERROR_QUESTION_MUST_BE_NON_EMPTY_STRING)
 
-        raw_choices = item.get(constants.QUIZ_FIELD_CHOICES)
+        choices_key = constants.QUIZ_FIELD_CHOICES
+        raw_choices = item.get(choices_key)
         if not isinstance(raw_choices, list) or len(raw_choices) != constants.CHOICE_COUNT:
             raise ValueError(
                 constants.ERROR_CHOICES_LENGTH_TEMPLATE.format(
@@ -39,15 +41,18 @@ class QuizPayloadMapper:
                 raise ValueError(constants.ERROR_CHOICE_MUST_BE_NON_EMPTY_STRING)
             choices.append(choice)
 
-        answer = item.get(constants.QUIZ_FIELD_ANSWER)
+        answer_key = constants.QUIZ_FIELD_ANSWER
+        answer = item.get(answer_key)
         if not isinstance(answer, int) or isinstance(answer, bool):
             raise ValueError(constants.ERROR_ANSWER_MUST_BE_INTEGER)
 
-        hint = item.get(constants.QUIZ_FIELD_HINT)
+        hint_key = constants.QUIZ_FIELD_HINT
+        hint = item.get(hint_key)
         if hint is not None and (not isinstance(hint, str) or not hint.strip()):
             raise ValueError(constants.ERROR_HINT_MUST_BE_NON_EMPTY_STRING)
 
-        return self.quiz_factory.create(
+        quiz_factory = self.quiz_factory
+        return quiz_factory.create(
             question=question,
             choices=choices,
             answer=answer,

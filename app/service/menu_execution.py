@@ -1,7 +1,7 @@
 from app.service.game_runtime_state import GameRuntimeState
 from app.service.quiz_catalog_workflow import QuizCatalogWorkflow
 from app.service.quiz_play_workflow import QuizPlayWorkflow
-from app.ui.console_ui import ConsoleUI
+from app.console_interface import ConsoleInterface
 
 
 class MenuExecution:
@@ -15,7 +15,7 @@ class MenuExecution:
 
     def play(
         self,
-        console_interface: ConsoleUI,
+        console_interface: ConsoleInterface,
         runtime_state: GameRuntimeState,
     ) -> None:
         quiz_play_workflow = self.quiz_play_workflow
@@ -35,7 +35,7 @@ class MenuExecution:
 
     def show_best_score(
         self,
-        console_interface: ConsoleUI,
+        console_interface: ConsoleInterface,
         runtime_state: GameRuntimeState,
     ) -> None:
         runtime_state.show_best_score_on(console_interface)

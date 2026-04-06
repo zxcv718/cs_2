@@ -4,24 +4,26 @@ import app.config.constants as constants
 from app.model.quiz import Quiz
 from app.model.quiz_catalog import QuizCatalog
 from app.service.quiz_metrics import QuestionCount
-from app.ui.console_ui import ConsoleUI
+from app.console_interface import ConsoleInterface
 
 
 class QuizSelectionService:
-    def __init__(self, console_interface: ConsoleUI) -> None:
+    def __init__(self, console_interface: ConsoleInterface) -> None:
         self.console_interface = console_interface
 
     def show_no_quizzes(self) -> None:
-        self.console_interface.show_message(constants.MESSAGE_NO_QUIZZES)
+        console_interface = self.console_interface
+        console_interface.show_message(constants.MESSAGE_NO_QUIZZES)
 
     def choose_question_count(self, total_questions: int) -> QuestionCount:
-        return QuestionCount(
-            self.console_interface.request_valid_number(
-            constants.PROMPT_QUESTION_COUNT_TEMPLATE.format(count=total_questions),
+        console_interface = self.console_interface
+        prompt = constants.PROMPT_QUESTION_COUNT_TEMPLATE.format(count=total_questions)
+        question_count = console_interface.request_valid_number(
+            prompt,
             constants.DISPLAY_INDEX_START,
             total_questions,
         )
-        )
+        return QuestionCount(question_count)
 
     def select_quizzes(
         self,

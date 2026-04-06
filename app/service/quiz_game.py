@@ -21,14 +21,14 @@ from app.service.quiz_result_recorder import QuizResultRecorder
 from app.service.quiz_score_keeper import QuizScoreKeeper
 from app.service.quiz_session_service import QuizSessionService
 from app.service.quiz_scoring_service import QuizScoringService
-from app.ui.console_ui import ConsoleUI
+from app.console_interface import ConsoleInterface
 
 
 # 전체 프로그램 흐름을 조율하는 메인 서비스입니다.
 class QuizGame:
     def __init__(
         self,
-        console_interface: ConsoleUI,
+        console_interface: ConsoleInterface,
         state_repository: StateRepository,
     ) -> None:
         state_service = GameStateService(state_repository)
@@ -89,10 +89,16 @@ class QuizGame:
         )
 
     def initialize_state(self) -> None:
-        self.quiz_game_runner.initialize_state(self.runtime_state)
+        quiz_game_runner = self.quiz_game_runner
+        runtime_state = self.runtime_state
+        quiz_game_runner.initialize_state(runtime_state)
 
     def persist_state(self) -> None:
-        self.quiz_game_runner.persist_state(self.runtime_state)
+        quiz_game_runner = self.quiz_game_runner
+        runtime_state = self.runtime_state
+        quiz_game_runner.persist_state(runtime_state)
 
     def run(self) -> None:
-        self.quiz_game_runner.run(self.runtime_state)
+        quiz_game_runner = self.quiz_game_runner
+        runtime_state = self.runtime_state
+        quiz_game_runner.run(runtime_state)

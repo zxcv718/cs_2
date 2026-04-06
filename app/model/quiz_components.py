@@ -26,11 +26,11 @@ class ChoiceSet:
 
     @classmethod
     def from_raw(cls, choices: list[str]) -> "ChoiceSet":
-        if not isinstance(choices, list) or len(choices) != constants.CHOICE_COUNT:
+        choice_count = constants.CHOICE_COUNT
+        if not isinstance(choices, list) or len(choices) != choice_count:
+            error_template = constants.ERROR_CHOICES_LENGTH_TEMPLATE
             raise ValueError(
-                constants.ERROR_CHOICES_LENGTH_TEMPLATE.format(
-                    choice_count=constants.CHOICE_COUNT
-                )
+                error_template.format(choice_count=choice_count)
             )
 
         normalized_choices: list[str] = []
@@ -50,16 +50,27 @@ class AnswerNumber:
 
     @classmethod
     def from_raw(cls, answer: int) -> "AnswerNumber":
-        if not isinstance(answer, int) or isinstance(answer, bool):
+        if cls._is_not_integer(answer):
             raise ValueError(constants.ERROR_ANSWER_MUST_BE_INTEGER)
-        if answer < constants.MIN_ANSWER or answer > constants.MAX_ANSWER:
+        if cls._is_out_of_range(answer):
+            error_template = constants.ERROR_ANSWER_RANGE_TEMPLATE
             raise ValueError(
-                constants.ERROR_ANSWER_RANGE_TEMPLATE.format(
+                error_template.format(
                     min_answer=constants.MIN_ANSWER,
                     max_answer=constants.MAX_ANSWER,
                 )
             )
         return cls(answer)
+
+    @staticmethod
+    def _is_not_integer(answer: int) -> bool:
+        return not isinstance(answer, int) or isinstance(answer, bool)
+
+    @staticmethod
+    def _is_out_of_range(answer: int) -> bool:
+        minimum_answer = constants.MIN_ANSWER
+        maximum_answer = constants.MAX_ANSWER
+        return answer < minimum_answer or answer > maximum_answer
 
     def __int__(self) -> int:
         return self.value
@@ -141,15 +152,14 @@ class QuizPrompt:
         return self._choice_lines(choice_template)
 
     def _choice_lines(self, choice_template: str) -> tuple[str, ...]:
+        choice_lines = self.render_choice_lines()
+        start = constants.DISPLAY_INDEX_START
         return tuple(
             choice_template.format(
                 choice_index=choice_index,
                 choice=choice,
             )
-            for choice_index, choice in enumerate(
-                self.render_choice_lines(),
-                start=constants.DISPLAY_INDEX_START,
-            )
+            for choice_index, choice in enumerate(choice_lines, start=start)
         )
 
 
@@ -174,7 +184,8 @@ class QuizSolution:
     def render_wrong_answer_message(self, prompt: QuizPrompt) -> str:
         answer_number = self.answer_number
         correct_choice_line = prompt.render_choice_line_for(answer_number)
-        return constants.ERROR_WRONG_ANSWER_TEMPLATE.format(
+        error_template = constants.ERROR_WRONG_ANSWER_TEMPLATE
+        return error_template.format(
             answer=int(answer_number),
             correct_text=correct_choice_line,
         )

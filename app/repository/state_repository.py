@@ -21,8 +21,9 @@ class StateRepository:
 
     # 파일에서 게임 상태를 읽어 파이썬 객체로 바꿉니다.
     def load_state(self) -> dict[str, Any]:
+        state_file = self.state_file
         try:
-            with self.state_file.open(
+            with state_file.open(
                 constants.FILE_READ_MODE,
                 encoding=constants.STATE_ENCODING,
             ) as file:
@@ -38,7 +39,8 @@ class StateRepository:
         # JSON 문법이 맞아도 필요한 키가 빠졌을 수 있으므로
         # 파싱 성공 뒤에 한 번 더 스키마 검증을 합니다.
         try:
-            return self.payload_mapper.from_payload(data)
+            payload_mapper = self.payload_mapper
+            return payload_mapper.from_payload(data)
         except ValueError as exc:
             raise ValueError(constants.ERROR_INVALID_STATE_SCHEMA) from exc
 
@@ -49,12 +51,15 @@ class StateRepository:
         best_score: Optional[int],
         history: Optional[list[dict[str, Any]]] = None,
     ) -> None:
-        payload = self.payload_mapper.to_payload(quizzes, best_score, history)
+        payload_mapper = self.payload_mapper
+        payload = payload_mapper.to_payload(quizzes, best_score, history)
 
         # 폴더가 없으면 먼저 만들고 파일을 저장합니다.
         # dump는 파이썬 객체를 json형식으로 파일에 바로 저장하는 함수
-        self.state_file.parent.mkdir(parents=True, exist_ok=True)
-        with self.state_file.open(
+        state_file = self.state_file
+        state_directory = state_file.parent
+        state_directory.mkdir(parents=True, exist_ok=True)
+        with state_file.open(
             constants.FILE_WRITE_MODE,
             encoding=constants.STATE_ENCODING,
         ) as file:

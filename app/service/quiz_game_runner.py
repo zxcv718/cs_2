@@ -1,12 +1,12 @@
 from app.service.game_runtime_state import GameRuntimeState
 from app.service.quiz_game_execution import QuizGameExecution
-from app.ui.console_ui import ConsoleUI
+from app.console_interface import ConsoleInterface
 
 
 class QuizGameRunner:
     def __init__(
         self,
-        console_interface: ConsoleUI,
+        console_interface: ConsoleInterface,
         quiz_game_execution: QuizGameExecution,
     ) -> None:
         self.console_interface = console_interface

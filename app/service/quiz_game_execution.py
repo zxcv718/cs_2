@@ -4,7 +4,7 @@ from app.service.game_runtime_state import GameRuntimeState
 from app.service.menu_action_dispatcher import MenuActionDispatcher
 from app.service.quiz_metrics import MenuChoice
 from app.service.quiz_session_models import QuizSessionInterrupted
-from app.ui.console_ui import ConsoleUI
+from app.console_interface import ConsoleInterface
 
 
 class QuizGameExecution:
@@ -19,7 +19,7 @@ class QuizGameExecution:
     def initialize_state(
         self,
         runtime_state: GameRuntimeState,
-        console_interface: ConsoleUI,
+        console_interface: ConsoleInterface,
     ) -> None:
         game_bootstrap_service = self.game_bootstrap_service
         runtime_state.initialize_with(game_bootstrap_service, console_interface)
@@ -31,7 +31,7 @@ class QuizGameExecution:
     def run(
         self,
         runtime_state: GameRuntimeState,
-        console_interface: ConsoleUI,
+        console_interface: ConsoleInterface,
     ) -> None:
         self.initialize_state(runtime_state, console_interface)
         has_delete = constants.ENABLE_DELETE_MENU
@@ -48,7 +48,7 @@ class QuizGameExecution:
         runtime_state: GameRuntimeState,
         has_delete: bool,
         maximum_menu_choice: int,
-        console_interface: ConsoleUI,
+        console_interface: ConsoleInterface,
     ) -> None:
         menu_action_dispatcher = self.menu_action_dispatcher
         while True:
