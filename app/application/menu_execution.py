@@ -100,7 +100,7 @@ class DeleteMenuAction:
         menu_choice: MenuChoice,
         delete_menu_availability: DeleteMenuAvailability,
     ) -> bool:
-        return menu_choice.matches_delete(delete_menu_availability)
+        return delete_menu_availability.matches_delete_choice(menu_choice)
 
     def execute(
         self,
@@ -123,7 +123,7 @@ class BestScoreMenuAction:
         menu_choice: MenuChoice,
         delete_menu_availability: DeleteMenuAvailability,
     ) -> bool:
-        return menu_choice.matches_score(delete_menu_availability)
+        return delete_menu_availability.matches_score_choice(menu_choice)
 
     def execute(
         self,

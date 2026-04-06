@@ -6,6 +6,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 APP_ROOT = PROJECT_ROOT / "app"
 FORBIDDEN_ABBREVIATIONS = {"cfg", "ctx", "svc", "repo", "ui", "val", "msg"}
+RULE_SIX_METHOD_LIMIT = 10
 
 
 def production_files() -> list[Path]:
@@ -108,6 +109,31 @@ class ArchitectureRulesTestCase(unittest.TestCase):
                             if isinstance(decorator, ast.Name) and decorator.id == "property":
                                 self.fail(f"{path}:{item.name} uses @property")
 
+    def test_public_methods_do_not_return_fields_directly(self):
+        for path in production_files():
+            tree = ast.parse(path.read_text())
+            for node in tree.body:
+                if not isinstance(node, ast.ClassDef):
+                    continue
+                for item in node.body:
+                    if not isinstance(item, ast.FunctionDef):
+                        continue
+                    if item.name.startswith("_") or item.name.startswith("__"):
+                        continue
+                    if len(item.body) != 1:
+                        continue
+                    return_statement = item.body[0]
+                    if not isinstance(return_statement, ast.Return):
+                        continue
+                    returned_value = return_statement.value
+                    if not isinstance(returned_value, ast.Attribute):
+                        continue
+                    if not isinstance(returned_value.value, ast.Name):
+                        continue
+                    if returned_value.value.id != "self":
+                        continue
+                    self.fail(f"{path}:{item.name} returns internal field directly")
+
     def test_every_class_has_at_most_two_instance_fields(self):
         for path in production_files():
             tree = ast.parse(path.read_text())
@@ -132,6 +158,21 @@ class ArchitectureRulesTestCase(unittest.TestCase):
                     len(fields),
                     2,
                     f"{path}:{node.name} has more than two instance fields: {fields}",
+                )
+
+    def test_classes_stay_under_rule_six_method_limit(self):
+        for path in production_files():
+            tree = ast.parse(path.read_text())
+            for node in tree.body:
+                if not isinstance(node, ast.ClassDef):
+                    continue
+                method_count = len(
+                    [item for item in node.body if isinstance(item, ast.FunctionDef)]
+                )
+                self.assertLessEqual(
+                    method_count,
+                    RULE_SIX_METHOD_LIMIT,
+                    f"{path}:{node.name} exceeds the rule-6 method limit with {method_count} methods",
                 )
 
     def test_model_and_repository_layer_dependencies_stay_clean(self):

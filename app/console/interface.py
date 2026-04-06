@@ -7,19 +7,8 @@ from app.model.quiz_catalog import QuizCatalog
 from app.service.quiz_metrics import DeleteMenuAvailability, DisplayIndex, MenuChoice, QuestionCount
 
 
-class ConsoleInterface:
-    def __init__(
-        self,
-        console_input: ConsoleInput | None = None,
-        console_output: ConsoleOutput | None = None,
-    ) -> None:
-        output = console_output or ConsoleOutput()
-        self.console_output = output
-        self.console_input = console_input or ConsoleInput(output.show_error)
-
-    def show_menu(self, delete_menu_availability: DeleteMenuAvailability) -> None:
-        console_output = self.console_output
-        console_output.show_menu(delete_menu_availability)
+class ConsoleReader:
+    console_input: ConsoleInput
 
     def request_menu_choice(self, min_value: int, max_value: int) -> MenuChoice:
         console_input = self.console_input
@@ -50,6 +39,14 @@ class ConsoleInterface:
     ) -> Union[int, str]:
         console_input = self.console_input
         return console_input.request_answer_or_hint(prompt, min_value, max_value)
+
+
+class ConsoleWriter:
+    console_output: ConsoleOutput
+
+    def show_menu(self, delete_menu_availability: DeleteMenuAvailability) -> None:
+        console_output = self.console_output
+        console_output.show_menu(delete_menu_availability)
 
     def show_message(self, message: str) -> None:
         console_output = self.console_output
@@ -90,3 +87,17 @@ class ConsoleInterface:
             total_questions,
             hint_used_count,
         )
+
+
+class ConsoleInterface(
+    ConsoleReader,
+    ConsoleWriter,
+):
+    def __init__(
+        self,
+        console_input: ConsoleInput | None = None,
+        console_output: ConsoleOutput | None = None,
+    ) -> None:
+        output = console_output or ConsoleOutput()
+        self.console_output = output
+        self.console_input = console_input or ConsoleInput(output.show_error)

@@ -7,12 +7,15 @@ from app.presentation.quiz_presenter import QuizPresenter
 from app.service.quiz_metrics import DeleteMenuAvailability, DisplayIndex, QuestionCount
 
 
-class ConsoleOutput:
-    def __init__(self, quiz_presenter: QuizPresenter | None = None) -> None:
-        self.quiz_presenter = quiz_presenter or QuizPresenter()
+class LinePrinter:
+    def _print_lines(self, lines: tuple[str, ...]) -> None:
+        for line in lines:
+            print(line)
 
+
+class MenuConsoleOutput(LinePrinter):
     def show_menu(self, delete_menu_availability: DeleteMenuAvailability) -> None:
-        menu_lines = self._menu_lines(delete_menu_availability)
+        menu_lines = delete_menu_availability.menu_lines()
         separator = constants.PRIMARY_SEPARATOR
         app_title = constants.APP_TITLE
         separator_length = constants.SEPARATOR_LENGTH
@@ -22,11 +25,17 @@ class ConsoleOutput:
         self._print_lines(menu_lines)
         print(separator)
 
+
+class MessageConsoleOutput:
     def show_message(self, message: str) -> None:
         print(message)
 
     def show_error(self, message: str) -> None:
         print(f"{constants.ERROR_PREFIX}{message}")
+
+
+class QuizListConsoleOutput(LinePrinter, MessageConsoleOutput):
+    quiz_presenter: QuizPresenter
 
     def show_quiz_list(self, quiz_catalog: QuizCatalog) -> None:
         show_message = self.show_message
@@ -41,6 +50,21 @@ class ConsoleOutput:
         self._listing_lines(quiz_catalog)
         print(separator)
 
+    def _listing_lines(self, quiz_catalog: QuizCatalog) -> None:
+        quiz_presenter = self.quiz_presenter
+        for quiz_position, quiz in enumerate(
+            quiz_catalog,
+            start=constants.DISPLAY_INDEX_START,
+        ):
+            display_index = DisplayIndex(quiz_position)
+            listing_lines = quiz_presenter.listing_lines(
+                quiz,
+                display_index,
+            )
+            self._print_lines(listing_lines)
+
+
+class BestScoreConsoleOutput(MessageConsoleOutput):
     def display_best_score(self, best_score: Optional[int]) -> None:
         show_message = self.show_message
         if best_score is None:
@@ -48,6 +72,10 @@ class ConsoleOutput:
             return
         template = constants.BEST_SCORE_TEMPLATE
         show_message(template.format(best_score=best_score))
+
+
+class QuestionConsoleOutput(LinePrinter):
+    quiz_presenter: QuizPresenter
 
     def show_question(
         self,
@@ -62,6 +90,13 @@ class ConsoleOutput:
         self._hint_instruction(quiz)
         print(constants.SECONDARY_SEPARATOR)
 
+    def _hint_instruction(self, quiz: Quiz) -> None:
+        if not quiz.can_offer_hint():
+            return
+        print(constants.MESSAGE_HINT_INSTRUCTION)
+
+
+class ResultConsoleOutput:
     def show_result(
         self,
         correct_count: int,
@@ -85,38 +120,6 @@ class ConsoleOutput:
         self._hint_usage(hint_used_count)
         print(separator)
 
-    def _menu_lines(
-        self,
-        delete_menu_availability: DeleteMenuAvailability,
-    ) -> tuple[str, ...]:
-        menu_lines_by_delete = {
-            True: constants.MENU_LINES_WITH_DELETE,
-            False: constants.MENU_LINES_WITHOUT_DELETE,
-        }
-        return menu_lines_by_delete[delete_menu_availability.shows_delete_option()]
-
-    def _print_lines(self, lines: tuple[str, ...]) -> None:
-        for line in lines:
-            print(line)
-
-    def _listing_lines(self, quiz_catalog: QuizCatalog) -> None:
-        quiz_presenter = self.quiz_presenter
-        for quiz_position, quiz in enumerate(
-            quiz_catalog,
-            start=constants.DISPLAY_INDEX_START,
-        ):
-            display_index = DisplayIndex(quiz_position)
-            listing_lines = quiz_presenter.listing_lines(
-                quiz,
-                display_index,
-            )
-            self._print_lines(listing_lines)
-
-    def _hint_instruction(self, quiz: Quiz) -> None:
-        if not quiz.can_offer_hint():
-            return
-        print(constants.MESSAGE_HINT_INSTRUCTION)
-
     def _hint_usage(self, hint_used_count: int) -> None:
         if not hint_used_count:
             return
@@ -126,3 +129,14 @@ class ConsoleOutput:
                 hint_used_count=hint_used_count
             )
         )
+
+
+class ConsoleOutput(
+    MenuConsoleOutput,
+    QuizListConsoleOutput,
+    BestScoreConsoleOutput,
+    QuestionConsoleOutput,
+    ResultConsoleOutput,
+):
+    def __init__(self, quiz_presenter: QuizPresenter | None = None) -> None:
+        self.quiz_presenter = quiz_presenter or QuizPresenter()

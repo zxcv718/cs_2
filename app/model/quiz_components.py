@@ -69,10 +69,6 @@ class ChoiceSet:
     def __iter__(self) -> Iterator[str]:
         return iter(self.values)
 
-    def choice_text(self, answer_number: "AnswerNumber") -> str:
-        choice_index = int(answer_number) - constants.DISPLAY_INDEX_START
-        return self.values[choice_index]
-
 
 @dataclass(frozen=True)
 class AnswerNumber:

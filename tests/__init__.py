@@ -1,1 +1,1 @@
-# 테스트 폴더를 패키지로 인식하게 하는 파일입니다.
+# unittest discovery compatibility marker.

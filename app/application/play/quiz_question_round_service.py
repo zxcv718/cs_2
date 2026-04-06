@@ -20,6 +20,10 @@ class QuizQuestionRoundInterrupted(Exception):
         self.hint_used_count = hint_used_count
 
 
+class HintAlreadyUsed(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class HintUseState:
     used: bool
@@ -28,10 +32,9 @@ class HintUseState:
     def unused(cls) -> "HintUseState":
         return cls(False)
 
-    def blocks_hint_request(self) -> bool:
-        return self.used
-
-    def mark_used(self) -> "HintUseState":
+    def consume(self) -> "HintUseState":
+        if self.used:
+            raise HintAlreadyUsed
         return HintUseState(True)
 
 
@@ -112,26 +115,11 @@ class QuizQuestionRoundService:
         quiz: Quiz,
         round_state: QuizQuestionRoundState,
     ) -> AnswerTally | None:
-        console_interface = self.console_interface
-        if not quiz.can_offer_hint():
-            console_interface.show_error(constants.ERROR_NO_HINT_FOR_QUESTION)
-            return None
-
-        hint_use_state = round_state.hint_use_state
-        if hint_use_state.blocks_hint_request():
-            console_interface.show_error(constants.ERROR_HINT_ALREADY_USED)
-            return None
-
-        quiz_presenter = self.quiz_presenter
-        hint_template = constants.MESSAGE_HINT_TEMPLATE
-        hint_message = hint_template.format(
-            hint=quiz_presenter.hint_message(quiz)
+        hint_request_handler = HintRequestHandler(
+            self.console_interface,
+            self.quiz_presenter,
         )
-        console_interface.show_message(hint_message)
-        round_state.hint_use_state = hint_use_state.mark_used()
-        hint_used_count = round_state.hint_used_count
-        round_state.hint_used_count = hint_used_count.incremented()
-        return None
+        return hint_request_handler.handle(quiz, round_state)
 
     def _correct_result(
         self,
@@ -157,3 +145,39 @@ class QuizQuestionRoundService:
             CorrectAnswerCount(constants.INITIAL_CORRECT_COUNT),
             round_state.hint_used_count,
         )
+
+
+class HintRequestHandler:
+    def __init__(
+        self,
+        console_interface: ConsoleInterface,
+        quiz_presenter: QuizPresenter,
+    ) -> None:
+        self.console_interface = console_interface
+        self.quiz_presenter = quiz_presenter
+
+    def handle(
+        self,
+        quiz: Quiz,
+        round_state: QuizQuestionRoundState,
+    ) -> AnswerTally | None:
+        if not quiz.can_offer_hint():
+            self.console_interface.show_error(constants.ERROR_NO_HINT_FOR_QUESTION)
+            return None
+        try:
+            hint_use_state = round_state.hint_use_state
+            round_state.hint_use_state = hint_use_state.consume()
+        except HintAlreadyUsed:
+            self.console_interface.show_error(constants.ERROR_HINT_ALREADY_USED)
+            return None
+        self._show_hint(quiz)
+        hint_used_count = round_state.hint_used_count
+        round_state.hint_used_count = hint_used_count.incremented()
+        return None
+
+    def _show_hint(self, quiz: Quiz) -> None:
+        hint_template = constants.MESSAGE_HINT_TEMPLATE
+        hint_message = hint_template.format(
+            hint=self.quiz_presenter.hint_message(quiz)
+        )
+        self.console_interface.show_message(hint_message)
