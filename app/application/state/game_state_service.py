@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, Optional
 
 from app.model.quiz import Quiz
@@ -23,3 +24,7 @@ class GameStateService:
     ) -> None:
         state_repository = self.state_repository
         state_repository.save_state(quizzes, best_score, history)
+
+    def backup_state_file(self) -> Path | None:
+        state_repository = self.state_repository
+        return state_repository.backup_state_file()

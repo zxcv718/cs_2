@@ -1,22 +1,34 @@
+import tempfile
 import unittest
-from typing import Optional
+from pathlib import Path
+from typing import Optional, cast
+from unittest.mock import patch
 
 import app.config.constants as constants
-from app.model.quiz import Quiz
-from app.model.quiz_catalog import QuizCatalog
-from app.model.quiz_factory import QuizFactory
-from app.console.interface import ConsoleInterface
+from app.application.menu_action_dispatcher import MenuActionDispatcher
 from app.application.play.best_score_service import BestScoreService
 from app.application.play.question_count_chooser import QuestionCountChooser
 from app.application.play.quiz_history_service import QuizHistoryService
 from app.application.play.quiz_partial_result_builder import QuizPartialResultBuilder
-from app.application.play.quiz_question_round_service import QuizQuestionRoundService
+from app.application.play.quiz_question_round_service import (
+    QuizQuestionRoundResult,
+    QuizQuestionRoundService,
+)
+from app.application.play.quiz_round_coordinator import QuizRoundCoordinator
 from app.application.play.quiz_scoring_service import QuizScoringService
 from app.application.play.quiz_session_models import QuizSessionInterrupted, QuizSessionResult
 from app.application.play.quiz_session_service import QuizSessionService
 from app.application.quiz_game import QuizGame
+from app.application.quiz_game_execution import QuizGameExecution
 from app.application.state.default_game_state_factory import DefaultGameStateFactory
+from app.application.state.game_bootstrap_service import GameBootstrapService
+from app.application.state.game_runtime_state import GameRuntimeState
 from app.application.state.game_state_service import GameStateService
+from app.console.input import ConsoleInput
+from app.console.interface import ConsoleInterface
+from app.model.quiz import Quiz
+from app.model.quiz_catalog import QuizCatalog
+from app.model.quiz_factory import QuizFactory
 from app.repository.state_repository import StateRepository
 from app.service.quiz_metrics import (
     CorrectAnswerCount,
@@ -107,6 +119,63 @@ class AnswerThenHintThenInterruptConsoleInterface(DummyConsoleInterface):
         raise KeyboardInterrupt
 
 
+class ManyHintsThenCorrectConsoleInterface(DummyConsoleInterface):
+    def __init__(self, hint_attempt_count: int, final_answer: int):
+        super().__init__()
+        self.hint_attempt_count = hint_attempt_count
+        self.final_answer = final_answer
+
+    def show_question(self, quiz, index, total):
+        return None
+
+    def request_answer_or_hint(self, prompt, min_value=1, max_value=4):
+        if self.hint_attempt_count > 0:
+            self.hint_attempt_count -= 1
+            return constants.HINT_COMMAND_VALUE
+        return self.final_answer
+
+
+class RepeatingMenuConsoleInterface(DummyConsoleInterface):
+    def show_menu(self, has_delete=False):
+        return None
+
+    def request_menu_choice(self, min_value, max_value):
+        return MenuChoice(constants.MENU_PLAY)
+
+
+class NoOpBootstrapService:
+    def initialize(self, runtime_state, console_interface):
+        return None
+
+
+class CountingMenuDispatcher:
+    def __init__(self, continue_count: int):
+        self.continue_count = continue_count
+
+    def dispatch(self, menu_choice, runtime_state, has_delete, console_interface):
+        if self.continue_count == 0:
+            return False
+        self.continue_count -= 1
+        return True
+
+    def persist(self, runtime_state):
+        return None
+
+    def handle_interrupted_session(self, runtime_state, result):
+        return None
+
+    def handle_interrupted_program(self, runtime_state):
+        return None
+
+
+class AlwaysIncorrectRoundService:
+    def play_round(self, quiz, index, total_questions):
+        return QuizQuestionRoundResult(
+            CorrectAnswerCount(0),
+            HintUsageCount(0),
+        )
+
+
 # 실제 파일 대신 메모리에 저장 결과를 남기는 가짜 저장소입니다.
 class DummyStateRepository(StateRepository):
     def __init__(self):
@@ -129,6 +198,9 @@ class DummyStateRepository(StateRepository):
             "best_score": best_score,
             "history": history or [],
         }
+
+    def backup_state_file(self):
+        return None
 
 
 # 파일이 없을 때의 상황을 흉내 냅니다.
@@ -312,6 +384,23 @@ class QuizQuestionRoundServiceTestCase(unittest.TestCase):
         self.assertEqual(int(result.hint_used_count), 1)
         self.assertTrue(console_interface.messages)
 
+    def test_play_round_handles_many_retry_inputs_without_recursion_error(self):
+        console_interface = ManyHintsThenCorrectConsoleInterface(
+            hint_attempt_count=1200,
+            final_answer=1,
+        )
+        service = QuizQuestionRoundService(console_interface)
+        quiz = QuizFactory().create("문제", ["A", "B", "C", "D"], 1)
+
+        result = service.play_round(
+            quiz,
+            index=DisplayIndex(1),
+            total_questions=QuestionCount(1),
+        )
+
+        self.assertEqual(int(result.correct_count), 1)
+        self.assertEqual(len(console_interface.errors), 1200)
+
 
 class QuizPartialResultBuilderTestCase(unittest.TestCase):
     def test_build_interrupted_result_returns_none_before_any_answer(self):
@@ -368,6 +457,54 @@ class QuizSessionServiceTestCase(unittest.TestCase):
         assert partial_result is not None
         self.assertEqual(int(partial_result.correct_count), 1)
         self.assertEqual(int(partial_result.hint_used_count), 1)
+
+
+class ConsoleInputTestCase(unittest.TestCase):
+    def test_request_non_empty_text_handles_many_invalid_attempts_without_recursion_error(self):
+        errors = []
+        console_input = ConsoleInput(errors.append)
+        responses = [""] * 1200 + ["정상 입력"]
+
+        with patch("builtins.input", side_effect=responses):
+            result = console_input.request_non_empty_text("입력: ")
+
+        self.assertEqual(result, "정상 입력")
+        self.assertEqual(len(errors), 1200)
+
+
+class QuizRoundCoordinatorTestCase(unittest.TestCase):
+    def test_play_selected_quizzes_handles_large_quiz_count_without_recursion_error(self):
+        coordinator = QuizRoundCoordinator(
+            cast(QuizQuestionRoundService, AlwaysIncorrectRoundService()),
+            QuizPartialResultBuilder(),
+        )
+        factory = QuizFactory()
+        quizzes = [
+            factory.create(f"문제{i}", ["A", "B", "C", "D"], 1)
+            for i in range(1200)
+        ]
+
+        result = coordinator.play_selected_quizzes(quizzes)
+
+        self.assertEqual(int(result.total_questions), 1200)
+        self.assertEqual(int(result.correct_count), 0)
+        self.assertEqual(int(result.hint_used_count), 0)
+
+
+class QuizGameExecutionTestCase(unittest.TestCase):
+    def test_run_handles_many_menu_cycles_without_recursion_error(self):
+        dispatcher = CountingMenuDispatcher(continue_count=1200)
+        execution = QuizGameExecution(
+            cast(GameBootstrapService, NoOpBootstrapService()),
+            cast(MenuActionDispatcher, dispatcher),
+        )
+
+        execution.run(
+            GameRuntimeState(),
+            RepeatingMenuConsoleInterface(),
+        )
+
+        self.assertEqual(dispatcher.continue_count, 0)
 
 
 # QuizGame이 하위 서비스를 제대로 호출하는지 테스트합니다.
@@ -443,6 +580,26 @@ class QuizGameTestCase(unittest.TestCase):
 
         self.assertGreaterEqual(len(game.runtime_state.quiz_catalog), 5)
         self.assertTrue(console_interface.errors)
+
+    def test_initialize_state_preserves_invalid_file_before_restoring_defaults(self):
+        broken_text = "{broken json"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_file = Path(temp_dir) / "state.json"
+            state_file.write_text(broken_text, encoding="utf-8")
+            console_interface = DummyConsoleInterface()
+            game = QuizGame(console_interface, StateRepository(state_file))
+
+            game.initialize_state()
+
+            backup_file = Path(temp_dir) / "state.json.bak"
+            self.assertTrue(backup_file.exists())
+            self.assertEqual(
+                backup_file.read_text(encoding="utf-8"),
+                broken_text,
+            )
+            restored_state = StateRepository(state_file).load_state()
+            self.assertGreaterEqual(len(restored_state["quizzes"]), 5)
+            self.assertTrue(console_interface.errors)
 
     def test_run_persists_partial_result_when_session_is_interrupted(self):
         console_interface = PlayMenuOnceConsoleInterface()

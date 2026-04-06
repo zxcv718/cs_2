@@ -4,7 +4,6 @@ from app.application.play.quiz_session_models import QuizSessionInterrupted
 from app.application.state.game_bootstrap_service import GameBootstrapService
 from app.application.state.game_runtime_state import GameRuntimeState
 from app.console.interface import ConsoleInterface
-from app.service.quiz_metrics import MenuChoice
 
 
 class QuizGameExecution:
@@ -36,45 +35,26 @@ class QuizGameExecution:
         self.initialize_state(runtime_state, console_interface)
         has_delete = constants.ENABLE_DELETE_MENU
         maximum_menu_choice = self._maximum_menu_choice(has_delete)
-        self._run_once(
-            runtime_state,
-            has_delete,
-            maximum_menu_choice,
-            console_interface,
-        )
-
-    def _run_once(
-        self,
-        runtime_state: GameRuntimeState,
-        has_delete: bool,
-        maximum_menu_choice: int,
-        console_interface: ConsoleInterface,
-    ) -> None:
         menu_action_dispatcher = self.menu_action_dispatcher
-        try:
-            should_continue = self._dispatched_once(
-                runtime_state,
-                has_delete,
-                maximum_menu_choice,
-                console_interface,
-            )
-        except QuizSessionInterrupted as interrupted:
-            menu_action_dispatcher.handle_interrupted_session(
-                runtime_state,
-                interrupted.partial_result,
-            )
-            return
-        except (KeyboardInterrupt, EOFError):
-            menu_action_dispatcher.handle_interrupted_program(runtime_state)
-            return
-        if not should_continue:
-            return
-        self._run_once(
-            runtime_state,
-            has_delete,
-            maximum_menu_choice,
-            console_interface,
-        )
+        while True:
+            try:
+                should_continue = self._dispatched_once(
+                    runtime_state,
+                    has_delete,
+                    maximum_menu_choice,
+                    console_interface,
+                )
+            except QuizSessionInterrupted as interrupted:
+                menu_action_dispatcher.handle_interrupted_session(
+                    runtime_state,
+                    interrupted.partial_result,
+                )
+                return
+            except (KeyboardInterrupt, EOFError):
+                menu_action_dispatcher.handle_interrupted_program(runtime_state)
+                return
+            if not should_continue:
+                return
 
     def _dispatched_once(
         self,

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import NoReturn
 
 import app.config.constants as constants
 from app.application.play.quiz_partial_result_builder import QuizPartialResultBuilder
@@ -29,55 +29,33 @@ class QuizRoundCoordinator:
     def play_selected_quizzes(
         self,
         selected_quizzes: list[Quiz],
-    ) -> Optional[QuizSessionResult]:
+    ) -> QuizSessionResult:
         total_questions = QuestionCount(len(selected_quizzes))
         correct_count = CorrectAnswerCount(constants.INITIAL_CORRECT_COUNT)
         hint_used_count = HintUsageCount(constants.INITIAL_HINT_USED_COUNT)
         answered_question_count = QuestionCount(constants.INITIAL_CORRECT_COUNT)
-        return self._played_result(
-            selected_quizzes,
+        for quiz in selected_quizzes:
+            try:
+                round_result = self._round_result(
+                    quiz,
+                    total_questions,
+                    answered_question_count,
+                )
+            except QuizQuestionRoundInterrupted as interrupted:
+                self._interrupted_result(
+                    total_questions,
+                    correct_count,
+                    hint_used_count.add(interrupted.hint_used_count),
+                    answered_question_count,
+                    interrupted,
+                )
+            correct_count = correct_count.add(round_result.correct_count)
+            hint_used_count = hint_used_count.add(round_result.hint_used_count)
+            answered_question_count = answered_question_count.incremented()
+        return self._completed_result(
             total_questions,
             correct_count,
             hint_used_count,
-            answered_question_count,
-        )
-
-    def _played_result(
-        self,
-        selected_quizzes: list[Quiz],
-        total_questions: QuestionCount,
-        correct_count: CorrectAnswerCount,
-        hint_used_count: HintUsageCount,
-        answered_question_count: QuestionCount,
-    ) -> QuizSessionResult:
-        if not selected_quizzes:
-            return self._completed_result(
-                total_questions,
-                correct_count,
-                hint_used_count,
-            )
-        quiz = selected_quizzes[0]
-        remaining_quizzes = selected_quizzes[1:]
-        try:
-            round_result = self._round_result(
-                quiz,
-                total_questions,
-                answered_question_count,
-            )
-        except QuizQuestionRoundInterrupted as interrupted:
-            return self._interrupted_result(
-                total_questions,
-                correct_count,
-                hint_used_count.add(interrupted.hint_used_count),
-                answered_question_count,
-                interrupted,
-            )
-        return self._played_result(
-            remaining_quizzes,
-            total_questions,
-            correct_count.add(round_result.correct_count),
-            hint_used_count.add(round_result.hint_used_count),
-            answered_question_count.incremented(),
         )
 
     def _round_result(
@@ -114,7 +92,7 @@ class QuizRoundCoordinator:
         hint_used_count: HintUsageCount,
         answered_question_count: QuestionCount,
         interrupted: QuizQuestionRoundInterrupted,
-    ) -> QuizSessionResult:
+    ) -> NoReturn:
         partial_result_builder = self.partial_result_builder
         raise QuizSessionInterrupted(
             partial_result_builder.build_interrupted_result(

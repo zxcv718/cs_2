@@ -48,6 +48,7 @@ class QuizGame:
         default_state_recovery = DefaultStateRecovery(
             DefaultGameStateFactory(),
             persistence_service,
+            state_service,
         )
         game_exit_persistence = GameExitPersistence(
             persistence_service,

@@ -3,6 +3,7 @@ from typing import Any, Callable
 import app.config.constants as constants
 from app.application.state.default_game_state_factory import DefaultGameStateFactory
 from app.application.state.game_persistence_service import GamePersistenceService
+from app.application.state.game_state_service import GameStateService
 
 
 class DefaultStateRecovery:
@@ -10,9 +11,11 @@ class DefaultStateRecovery:
         self,
         default_state_factory: DefaultGameStateFactory,
         persistence_service: GamePersistenceService,
+        state_service: GameStateService,
     ) -> None:
         self.default_state_factory = default_state_factory
         self.persistence_service = persistence_service
+        self.state_service = state_service
 
     def recover_for_missing_file(self, notify: Callable[[str], None]) -> dict[str, Any]:
         return self._recover(
@@ -22,10 +25,11 @@ class DefaultStateRecovery:
         )
 
     def recover_for_invalid_state(self, notify: Callable[[str], None]) -> dict[str, Any]:
+        should_save = self._backup_invalid_state_file()
         return self._recover(
             notify,
             constants.ERROR_STATE_CORRUPTED,
-            should_save=True,
+            should_save=should_save,
         )
 
     def recover_for_read_error(self, notify: Callable[[str], None]) -> dict[str, Any]:
@@ -53,3 +57,10 @@ class DefaultStateRecovery:
             state[constants.STATE_KEY_HISTORY],
         )
         return state
+
+    def _backup_invalid_state_file(self) -> bool:
+        state_service = self.state_service
+        try:
+            return state_service.backup_state_file() is not None
+        except OSError:
+            return False

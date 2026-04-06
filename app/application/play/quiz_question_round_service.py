@@ -53,19 +53,12 @@ class QuizQuestionRoundService:
         round_state = QuizQuestionRoundState()
 
         try:
-            return self._play_until_finished(quiz, round_state)
+            while True:
+                round_result = self._result_for_next_input(quiz, round_state)
+                if round_result is not None:
+                    return round_result
         except (KeyboardInterrupt, EOFError) as exc:
             raise QuizQuestionRoundInterrupted(round_state.hint_used_count) from exc
-
-    def _play_until_finished(
-        self,
-        quiz: Quiz,
-        round_state: QuizQuestionRoundState,
-    ) -> QuizQuestionRoundResult:
-        round_result = self._result_for_next_input(quiz, round_state)
-        if round_result is None:
-            return self._play_until_finished(quiz, round_state)
-        return round_result
 
     def _result_for_next_input(
         self,

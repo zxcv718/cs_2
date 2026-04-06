@@ -1,6 +1,8 @@
 import json
+import os
 from json import JSONDecodeError
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any, Optional, Union
 
 import app.config.constants as constants
@@ -46,16 +48,37 @@ class StateRepository:
         state_file = self.state_file
         state_directory = state_file.parent
         state_directory.mkdir(parents=True, exist_ok=True)
-        with state_file.open(
-            constants.FILE_WRITE_MODE,
-            encoding=constants.STATE_ENCODING,
-        ) as file:
-            json.dump(
-                payload,
-                file,
-                ensure_ascii=constants.STATE_JSON_ENSURE_ASCII,
-                indent=constants.STATE_JSON_INDENT,
-            )
+        temp_file: Path | None = None
+        try:
+            with NamedTemporaryFile(
+                mode=constants.FILE_WRITE_MODE,
+                encoding=constants.STATE_ENCODING,
+                dir=state_directory,
+                prefix=f".{state_file.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as file:
+                temp_file = Path(file.name)
+                json.dump(
+                    payload,
+                    file,
+                    ensure_ascii=constants.STATE_JSON_ENSURE_ASCII,
+                    indent=constants.STATE_JSON_INDENT,
+                )
+                file.flush()
+                os.fsync(file.fileno())
+            temp_file.replace(state_file)
+        except Exception:
+            self._cleanup_temporary_file(temp_file)
+            raise
+
+    def backup_state_file(self) -> Path | None:
+        state_file = self.state_file
+        if not state_file.exists():
+            return None
+        backup_file = self._available_backup_file_path()
+        state_file.replace(backup_file)
+        return backup_file
 
     def _loaded_json(self) -> Any:
         state_file = self.state_file
@@ -71,3 +94,24 @@ class StateRepository:
             return payload_mapper.from_payload(data)
         except ValueError as exc:
             raise ValueError(constants.ERROR_INVALID_STATE_SCHEMA) from exc
+
+    def _available_backup_file_path(self) -> Path:
+        state_file = self.state_file
+        backup_file = state_file.with_name(f"{state_file.name}.bak")
+        suffix_index = 1
+        while backup_file.exists():
+            backup_file = state_file.with_name(
+                f"{state_file.name}.bak.{suffix_index}"
+            )
+            suffix_index += 1
+        return backup_file
+
+    def _cleanup_temporary_file(self, temp_file: Path | None) -> None:
+        if temp_file is None:
+            return
+        try:
+            temp_file.unlink()
+        except FileNotFoundError:
+            return
+        except OSError:
+            return

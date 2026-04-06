@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from app.model.quiz_factory import QuizFactory
 from app.repository.quiz_payload_mapper import QuizPayloadMapper
@@ -121,6 +122,41 @@ class StateRepositoryTestCase(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             self.repository.load_state()
+
+    # 저장 도중 교체가 실패해도 기존 파일은 그대로 남아야 합니다.
+    def test_save_state_preserves_original_file_when_replace_fails(self):
+        original_text = '{"status": "original"}'
+        self.state_file.write_text(original_text, encoding="utf-8")
+        quizzes = [self.quiz_factory.create("문제", ["A", "B", "C", "D"], 1)]
+
+        with patch("pathlib.Path.replace", side_effect=OSError("replace failed")):
+            with self.assertRaises(OSError):
+                self.repository.save_state(quizzes, best_score=10, history=[])
+
+        self.assertEqual(
+            self.state_file.read_text(encoding="utf-8"),
+            original_text,
+        )
+        self.assertEqual(
+            sorted(path.name for path in Path(self.temp_dir.name).iterdir()),
+            ["state.json"],
+        )
+
+    # 손상된 상태 파일은 백업으로 옮겨 보존할 수 있어야 합니다.
+    def test_backup_state_file_moves_existing_file_to_backup(self):
+        broken_text = "{broken json"
+        self.state_file.write_text(broken_text, encoding="utf-8")
+
+        backup_file = self.repository.backup_state_file()
+
+        self.assertIsNotNone(backup_file)
+        assert backup_file is not None
+        self.assertFalse(self.state_file.exists())
+        self.assertTrue(backup_file.exists())
+        self.assertEqual(
+            backup_file.read_text(encoding="utf-8"),
+            broken_text,
+        )
 
     # 맞힌 문제 수가 전체 문제 수보다 크면 안 됩니다.
     def test_state_payload_mapper_rejects_correct_count_over_total(self):
